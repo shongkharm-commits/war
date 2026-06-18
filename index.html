@@ -1,0 +1,2447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <!-- --- DOMAIN REDIRECT --- -->
+    <script>
+        if (window.location.hostname === 'app.wargroups.com') {
+            window.location.replace('https://smart-finex.com' + window.location.pathname + window.location.search);
+        }
+    </script>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Smart finEx">
+    <link rel="apple-touch-icon" sizes="180x180" href="images/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="96x96" href="images/favicon-96x96.png">
+    <link rel="icon" type="image/svg+xml" href="images/favicon.svg">
+    <link rel="shortcut icon" href="images/favicon.ico">
+    <link rel="manifest" href="images/site.webmanifest">
+    <title>Smart finEx</title>
+    <!-- IMPORT WEB FONTS FOR iPHONE FALLBACK -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Lao:wght@400;500;600;700&display=swap" rel="stylesheet">
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+      }
+    </script>
+
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <style>
+        body { overscroll-behavior-y: none; transition: background-color 0.3s; }
+        ::-webkit-scrollbar { width: 0px; background: transparent; }
+        /* Add Noto Sans Lao as the web fallback for iPhones */
+        .font-lao { font-family: 'Phetsarath OT', 'Noto Sans Lao', sans-serif; }
+    </style>
+</head>
+<body class="bg-gray-100 dark:bg-[#050505]">
+    <div id="root"></div>
+
+    <script type="text/babel" data-type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, signInAnonymously, onAuthStateChanged, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot, addDoc, collection } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-analytics.js";
+
+        const { useState, useEffect, useMemo, useRef } = React;
+
+        // --- FIREBASE CLOUD SETUP ---
+        const isCanvas = typeof __firebase_config !== 'undefined';
+
+        const cloudflareFirebaseConfig = {
+          apiKey: "AIzaSyD4i3Yo9QcLcBoYjlm7cw-JiGQ7maduP4M",
+          authDomain: "smart-finex.firebaseapp.com",
+          projectId: "smart-finex",
+          storageBucket: "smart-finex.firebasestorage.app",
+          messagingSenderId: "113672652387",
+          appId: "1:113672652387:web:f1bddaab0b864d89ab9a56",
+          measurementId: "G-N8PSWFCVG4"
+        };
+
+        let app, auth, db, analytics;
+        try {
+          const firebaseConfig = isCanvas ? JSON.parse(__firebase_config) : cloudflareFirebaseConfig;
+          app = initializeApp(firebaseConfig);
+          auth = getAuth(app);
+          db = getFirestore(app);
+          analytics = getAnalytics(app);
+        } catch(e) {
+          console.error("Firebase Initialization Error:", e);
+        }
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'smart-finex';
+
+        const DICT = {
+          EN: {
+            calc: "Calculator", tracker: "Tracker", history: "History", copySave: "Copy & Save", copied: "Copied!",
+            scanChat: "Scan Chat", scanning: "Scanning AI...", realizedProfit: "Realized Profit (Locked)",
+            unrealizedValue: "Unrealized Value (Float)", liquidityPools: "Balance", configure: "Configure",
+            suggestedRates: "Suggested Rates", margin: "MARGIN", recentList: "Recent Transactions", receive: "Receive",
+            send: "Send", today: "TODAY", week: "WEEK", month: "MONTH", custom: "CUSTOM", smartLog: "Smart Log",
+            workingProfit: "Working Profit", weBuy: "We Buy", weSell: "We Sell",
+            noAutoDetect: "Couldn't auto-detect the rate. Please enter details:", fcyAmount: "FCY Amount",
+            currency: "Currency", rate: "Rate", amount: "Amount", whichDirection: "Which direction is this exchange?",
+            detectedRate: "DETECTED RATE", configTitle: "Configuration", configDesc: "Set your daily market rates, margin, and balances.",
+            marketRatesMargin: "1. Market Rates & Margin", targetMargin: "Target Profit Margin (%)",
+            poolsSetup: "2. Balance Setup", pool: "Balance", openingBal: "Current Bal.", alertBelow: "Alert Below",
+            cancel: "Cancel", saveSetup: "Save Setup", calcHistory: "Calc History", done: "Done", noHistory: "No history yet",
+            clearHistory: "Clear History", copy: "Copy", recall: "Recall", options: "Options", upgrade: "Upgrade to Pro",
+            contact: "Contact Us", rateApp: "Rate the App", report: "Report an Issue", txns: "TXNs", pair: "Pair",
+            pasteData: "Parse Data", language: "Language", theme: "Theme", light: "Light", dark: "Dark", system: "System",
+            markets: "Markets", globalAssets: "Global Assets", setAlert: "Set Alert", priceAlerts: "Price Alerts", asset: "Asset", condition: "Condition", targetPrice: "Target Price", above: "Above", below: "Below", saveAlert: "Save Alert", active: "Active", triggered: "Triggered",
+            swapRateAmt: "Swap Rate/Amt",
+            requestReport: "Request / Report", feedbackDesc: "Help us improve! Request a feature or report a bug.", feedbackType: "Type", featureReq: "Feature Request", bugReport: "Bug Report", generalAdvice: "General Advice", feedbackPlaceholder: "Tell us what's on your mind...", submit: "Submit Feedback",
+            viewAll: "View All", txLog: "Transaction Log", filterDate: "Filter by Date", clear: "Clear", update15s: "Updates every 15s", live15s: "Live (15s)",
+            exportReport: "Export Statement", downloadTxt: "Download .TXT", copyText: "Copy Text", selectDate: "Select Date",
+            installApp: "Add to Home Screen", installDesc: "For the best experience, install Smart finEx to your home screen for full-screen and offline access.", iosInst1: "Tap the Share button", iosInst2: "Select 'Add to Home Screen'", andInst1: "Tap the Menu button", andInst2: "Select 'Add to Home screen'", notNow: "Not Now", dontShowAgain: "Don't Show Again",
+            confirmDelete: "Are you sure you want to delete this transaction?", yesDelete: "Delete", unrealizedPnL: "Unrealized PnL",
+            exchangeMode: "Exchange", transferMode: "Transfer", transferFeeRecord: "Transfer / Fee Record", receivedBtn: "Received", sentBtn: "Sent", addToBalance: "+ to Balance", subFromBalance: "- from Balance"
+          },
+          LA: {
+            calc: "ເຄື່ອງຄິດເລກ", tracker: "ຕິດຕາມ", history: "ປະຫວັດ", copySave: "ກັອບປີ້ & ບັນທຶກ", copied: "ກັອບປີ້ແລ້ວ!",
+            scanChat: "ສະແກນແຊັດ", scanning: "ກຳລັງສະແກນ...", realizedProfit: "ກຳໄລທີ່ໄດ້ຮັບ (ລັອກ)",
+            unrealizedValue: "ກຳໄລລອຍຕົວ (ຍັງບໍ່ຂາຍ)", liquidityPools: "ຍອດເງິນ", configure: "ຕັ້ງຄ່າ",
+            suggestedRates: "ອັດຕາແນະນຳ", margin: "ກຳໄລ", recentList: "ລາຍການຫຼ້າສຸດ", receive: "ຮັບເຂົ້າ",
+            send: "ຈ່າຍອອກ", today: "ມື້ນີ້", week: "ອາທິດ", month: "ເດືອນ", custom: "ເລືອກມື້", smartLog: "ບັນທຶກອັດສະລິຍະ",
+            workingProfit: "ກຳໄລ", weBuy: "ຮັບຊື້", weSell: "ຂາຍ",
+            noAutoDetect: "ບໍ່ສາມາດກວດຫາອັດຕາແລກປ່ຽນ. ກະລຸນາປ້ອນຂໍ້ມູນ:", fcyAmount: "ຈຳນວນເງິນຕ່າງປະເທດ",
+            currency: "ສະກຸນເງິນ", rate: "ເລດ", amount: "ຈຳນວນ", whichDirection: "ທິດທາງການແລກປ່ຽນຄືແນວໃດ?",
+            detectedRate: "ເລດທີ່ກວດພົບ", configTitle: "ການຕັ້ງຄ່າ", configDesc: "ຕັ້ງຄ່າອັດຕາຕະຫຼາດ, ກຳໄລ ແລະ ຍອດເງິນ.",
+            marketRatesMargin: "1. ອັດຕາຕະຫຼາດ & ກຳໄລ", targetMargin: "ເປົ້າໝາຍກຳໄລ (%)",
+            poolsSetup: "2. ຕັ້ງຄ່າຍອດເງິນ", pool: "ຍອດເງິນ", openingBal: "ຍອດປະຈຸບັນ", alertBelow: "ເຕືອນເມື່ອຕ່ຳກວ່າ",
+            cancel: "ຍົກເລີກ", saveSetup: "ບັນທຶກ", calcHistory: "ປະຫວັດການຄິດໄລ່", done: "ສຳເລັດ", noHistory: "ຍັງບໍ່ມີປະຫວັດ",
+            clearHistory: "ລຶບປະຫວັດ", copy: "ກັອບປີ້", recall: "ຮຽກຄືນ", options: "ຕົວເລືອກ", upgrade: "ອັບເກຣດເປັນ Pro",
+            contact: "ຕິດຕໍ່ພວກເຮົາ", rateApp: "ໃຫ້ຄະແນນແອັບ", report: "ລາຍງານບັນຫາ", txns: "ລາຍການ", pair: "ຄູ່ເງິນ",
+            pasteData: "ວິເຄາະຂໍ້ມູນ", language: "ປ່ຽນພາສາ", theme: "ຮູບແບບ", light: "ແຈ້ງ", dark: "ມືດ", system: "ລະບົບ",
+            markets: "ຕະຫຼາດ", globalAssets: "ຊັບສິນທົ່ວໂລກ", setAlert: "ຕັ້ງແຈ້ງເຕືອນ", priceAlerts: "ແຈ້ງເຕືອນລາຄາ", asset: "ຊັບສິນ", condition: "ເງື່ອນໄຂ", targetPrice: "ລາຄາເປົ້າໝາຍ", above: "ສູງກວ່າ", below: "ຕ່ຳກວ່າ", saveAlert: "ບັນທຶກ", active: "ເຮັດວຽກຢູ່", triggered: "ແຈ້ງເຕືອນແລ້ວ",
+            swapRateAmt: "ສະຫຼັບເລດ/ຈຳນວນ",
+            requestReport: "ສະເໜີແນະ / ລາຍງານ", feedbackDesc: "ຊ່ວຍພວກເຮົາປັບປຸງ! ຂໍຄຸນສົມບັດໃໝ່ ຫຼື ລາຍງານບັນຫາ.", feedbackType: "ປະເພດ", featureReq: "ຂໍຄຸນສົມບັດໃໝ່", bugReport: "ລາຍງານບັນຫາ", generalAdvice: "ຄຳແນະນຳທົ່ວໄປ", feedbackPlaceholder: "ພິມຂໍ້ຄວາມຂອງທ່ານທີ່ນີ້...", submit: "ສົ່ງຄຳຕິຊົມ",
+            viewAll: "ເບິ່ງທັງໝົດ", txLog: "ບັນທຶກທຸລະກຳ (Log)", filterDate: "ເລືອກວັນທີ", clear: "ລຶບ", update15s: "ອັບເດດທຸກໆ 15 ວິນາທີ", live15s: "ສົດ (15ວິ)",
+            exportReport: "ອອກລາຍງານ (Statement)", downloadTxt: "ດາວໂຫຼດ .TXT", copyText: "ກັອບປີ້ຂໍ້ຄວາມ", selectDate: "ເລືອກວັນທີ",
+            installApp: "ເພີ່ມລົງໜ້າຈໍຫຼັກ", installDesc: "ເພື່ອການນຳໃຊ້ທີ່ດີທີ່ສຸດ, ກະລຸນາຕິດຕັ້ງແອັບໄວ້ໜ້າຈໍຫຼັກ ເພື່ອໃຊ້ງານເຕັມຈໍ ແລະ ບໍ່ໃຊ້ເນັດ.", iosInst1: "ກົດປຸ່ມ Share", iosInst2: "ເລືອກ 'Add to Home Screen'", andInst1: "ກົດປຸ່ມ Menu", andInst2: "ເລືອກ 'Add to Home screen'", notNow: "ໄວ້ເທື່ອໜ້າ", dontShowAgain: "ບໍ່ຕ້ອງສະແດງອີກ",
+            confirmDelete: "ທ່ານແນ່ໃຈບໍ່ວ່າຕ້ອງການລຶບທຸລະກຳນີ້?", yesDelete: "ລຶບ", unrealizedPnL: "Unrealized PnL",
+            exchangeMode: "ແລກປ່ຽນເງິນ", transferMode: "ໂອນເງິນ", transferFeeRecord: "ບັນທຶກ ໂອນ/ຄ່າທຳນຽມ", receivedBtn: "ຮັບເຂົ້າ", sentBtn: "ໂອນອອກ", addToBalance: "ເພີ່ມຍອດ", subFromBalance: "ຫັກຍອດ"
+          }
+        };
+
+        const App = () => {
+          const [user, setUser] = useState(null);
+          const [isAuthChecking, setIsAuthChecking] = useState(true);
+          const [showLoginModal, setShowLoginModal] = useState(false);
+          const [hasSkippedLogin, setHasSkippedLogin] = useState(localStorage.getItem('hasSkippedLogin') === 'true');
+          const [showInstallPrompt, setShowInstallPrompt] = useState(false);
+          const [syncStatus, setSyncStatus] = useState('Checking...');
+
+          // --- APP INSTALL PROMPT LOGIC ---
+          useEffect(() => {
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+            const hasHiddenInstall = localStorage.getItem('sf_hideInstall') === 'true';
+            if (!isStandalone && !hasHiddenInstall) {
+              const timer = setTimeout(() => setShowInstallPrompt(true), 3000);
+              return () => clearTimeout(timer);
+            }
+          }, []);
+
+          const handleDismissInstall = (forever) => {
+            if (forever) localStorage.setItem('sf_hideInstall', 'true');
+            setShowInstallPrompt(false);
+          };
+
+          // --- CLOUD SYNC & AUTHENTICATION ---
+          useEffect(() => {
+            if (!auth) {
+              setIsAuthChecking(false);
+              return;
+            }
+            const unsubscribe = onAuthStateChanged(auth, async (u) => {
+              if (u) {
+                setUser(u);
+                setIsAuthChecking(false);
+                setSyncStatus('Synced');
+              } else {
+                try {
+                  if (isCanvas && typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                  } else {
+                    await signInAnonymously(auth);
+                  }
+                } catch (e) {
+                  console.error("Firebase Auth error:", e);
+                  setIsAuthChecking(false);
+                }
+              }
+            });
+            return () => unsubscribe();
+          }, []);
+
+          // --- THEME & LANGUAGE STATE ---
+          const [lang, setLang] = useState(localStorage.getItem('sf_lang') || 'EN');
+          const [themePref, setThemePref] = useState(localStorage.getItem('themePref') || 'system');
+          const [isDark, setIsDark] = useState(true);
+          const t = (key) => DICT[lang][key] || key;
+
+          useEffect(() => { localStorage.setItem('sf_lang', lang); }, [lang]);
+
+          useEffect(() => {
+            localStorage.setItem('themePref', themePref);
+            const updateTheme = () => {
+              let dark = false;
+              if (themePref === 'system') dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+              else dark = themePref === 'dark';
+              setIsDark(dark);
+              if (dark) document.documentElement.classList.add('dark');
+              else document.documentElement.classList.remove('dark');
+            };
+            updateTheme();
+            const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+            mediaQuery.addEventListener('change', updateTheme);
+            return () => mediaQuery.removeEventListener('change', updateTheme);
+          }, [themePref]);
+
+          // --- CALCULATOR STATES ---
+          const [tokens, setTokens] = useState(['0']);
+          const [justEvaluated, setJustEvaluated] = useState(false);
+          const [history, setHistory] = useState([]);
+          const [showHistory, setShowHistory] = useState(false);
+          const [copiedIndex, setCopiedIndex] = useState(null);
+          const [mainCopied, setMainCopied] = useState(false);
+
+          // Smart Cursor State for editing mid-equation
+          const [cursorIndex, setCursorIndex] = useState(null);
+
+          // Auto-Transfer Detection States
+          const [usedPercentage, setUsedPercentage] = useState(false);
+          const [isFeePatternDetected, setIsFeePatternDetected] = useState(false);
+
+          const holdTimerRef = useRef(null);
+          const isLongPressRef = useRef(false);
+
+          // --- OFFLINE DETECTION STATE ---
+          const [isOffline, setIsOffline] = useState(!navigator.onLine);
+
+          useEffect(() => {
+            const handleOnline = () => setIsOffline(false);
+            const handleOffline = () => setIsOffline(true);
+            window.addEventListener('online', handleOnline);
+            window.addEventListener('offline', handleOffline);
+            return () => {
+              window.removeEventListener('online', handleOnline);
+              window.removeEventListener('offline', handleOffline);
+            };
+          }, []);
+
+          // --- APP & TRACKER STATES ---
+          const [activeTab, setActiveTab] = useState('calc');
+          const [transactions, setTransactions] = useState(JSON.parse(localStorage.getItem('sf_transactions')) || []);
+          const [showSaveModal, setShowSaveModal] = useState(false);
+          const [isScanning, setIsScanning] = useState(false);
+          const [txSuccess, setTxSuccess] = useState(false);
+
+          // Save Modal States (Exchange vs Transfer)
+          const [saveMode, setSaveMode] = useState('exchange');
+          const [transferTx, setTransferTx] = useState({ amt: '', cur: 'THB' });
+
+          const fileInputRef = useRef(null);
+          const [chartFilter, setChartFilter] = useState('1D');
+          const [showMenuModal, setShowMenuModal] = useState(false);
+          const [showExportModal, setShowExportModal] = useState(false);
+          const [exportDate, setExportDate] = useState(() => new Date().toISOString().split('T')[0]);
+          const [showTxLogModal, setShowTxLogModal] = useState(false);
+          const [logDateFilter, setLogDateFilter] = useState('');
+          const [txToDelete, setTxToDelete] = useState(null);
+          const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+          const [feedbackForm, setFeedbackForm] = useState({ type: 'featureReq', text: '' });
+          const [feedbackStatus, setFeedbackStatus] = useState('idle');
+
+          const [profitMargin, setProfitMargin] = useState(parseFloat(localStorage.getItem('sf_profitMargin')) || 0.0025);
+          const [openingBalances, setOpeningBalances] = useState(JSON.parse(localStorage.getItem('sf_openingBalances')) || { USD: 0, USDT: 0, LAK: 0, THB: 0, CNY: 0 });
+          const [liquidityThresholds, setLiquidityThresholds] = useState(JSON.parse(localStorage.getItem('sf_liquidityThresholds')) || { USD: 2000, USDT: 2000, LAK: 20000000, THB: 50000, CNY: 10000 });
+          const [marketRates, setMarketRates] = useState(JSON.parse(localStorage.getItem('sf_marketRates')) || { USD: 22000, USDT: 22000, THB: 684, CNY: 3180 });
+          const [rateHistory, setRateHistory] = useState(() => {
+            const saved = localStorage.getItem('sf_rateHistory');
+            if (saved) return JSON.parse(saved);
+            const currentRates = JSON.parse(localStorage.getItem('sf_marketRates')) || { USD: 22000, USDT: 22000, THB: 684, CNY: 3180 };
+            return [{ date: new Date(0).toISOString(), rates: currentRates }];
+          });
+
+          // --- REORDERING STATES ---
+          const defaultRateOrder = [ {base: 'USD', quote: 'LAK', dec: 0}, {base: 'USDT', quote: 'LAK', dec: 0}, {base: 'THB', quote: 'LAK', dec: 1}, {base: 'CNY', quote: 'LAK', dec: 0}, {base: 'USD', quote: 'THB', dec: 2} ];
+          const [poolOrder, setPoolOrder] = useState(() => JSON.parse(localStorage.getItem('sf_poolOrder')) || ['USD', 'USDT', 'THB', 'CNY', 'LAK']);
+          const [rateOrder, setRateOrder] = useState(() => JSON.parse(localStorage.getItem('sf_rateOrder')) || defaultRateOrder);
+          const [isReorderingPools, setIsReorderingPools] = useState(false);
+          const [isReorderingRates, setIsReorderingRates] = useState(false);
+
+          const [showLiquidityModal, setShowLiquidityModal] = useState(false);
+          const [configForm, setConfigForm] = useState({ balances: {}, thresholds: {}, rates: {}, margin: '' });
+
+          const [quickTx, setQuickTx] = useState({
+            unitAmt: '', resAmt: '', rate: '', unitCur: 'USD', resCur: 'LAK', isManual: false
+          });
+
+          // Helper for input formatting in forms
+          const formatInputStr = (val) => {
+              if (val === '' || val === undefined || val === null) return '';
+              let strVal = val.toString();
+              let isNegative = strVal.startsWith('-');
+              if (isNegative) strVal = strVal.substring(1);
+              let [intPart, decPart] = strVal.split('.');
+              intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+              let result = decPart !== undefined ? `${intPart}.${decPart}` : intPart;
+              return isNegative ? '-' + result : result;
+          };
+
+          useEffect(() => {
+            if (!isAuthChecking && activeTab === 'dash' && (!user || user.isAnonymous) && !hasSkippedLogin) {
+              setShowLoginModal(true);
+            }
+          }, [activeTab, user, hasSkippedLogin, isAuthChecking]);
+
+          const handleSkipLogin = () => {
+            setHasSkippedLogin(true);
+            localStorage.setItem('hasSkippedLogin', 'true');
+            setShowLoginModal(false);
+          };
+
+          const handleSubmitFeedback = () => {
+            if (!feedbackForm.text.trim()) return;
+            setFeedbackStatus('submitting');
+            setTimeout(() => {
+              setFeedbackStatus('success');
+              setTimeout(() => {
+                setShowFeedbackModal(false);
+                setFeedbackStatus('idle');
+                setFeedbackForm({ type: 'featureReq', text: '' });
+              }, 2000);
+            }, 1000);
+          };
+
+          // --- FETCH CLOUD DATA ---
+          useEffect(() => {
+            if (!user || !db) return;
+            const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'appData', 'state');
+            const unsub = onSnapshot(docRef, (docSnap) => {
+              if (docSnap.exists()) {
+                const data = docSnap.data();
+                if (data.transactions) setTransactions(data.transactions);
+                if (data.openingBalances) setOpeningBalances(data.openingBalances);
+                if (data.liquidityThresholds) setLiquidityThresholds(data.liquidityThresholds);
+                if (data.marketRates) setMarketRates(data.marketRates);
+                if (data.profitMargin !== undefined) setProfitMargin(data.profitMargin);
+                if (data.rateHistory) setRateHistory(data.rateHistory);
+                if (data.poolOrder) setPoolOrder(data.poolOrder);
+                if (data.rateOrder) setRateOrder(data.rateOrder);
+
+                if (data.transactions) localStorage.setItem('sf_transactions', JSON.stringify(data.transactions));
+                if (data.openingBalances) localStorage.setItem('sf_openingBalances', JSON.stringify(data.openingBalances));
+                if (data.liquidityThresholds) localStorage.setItem('sf_liquidityThresholds', JSON.stringify(data.liquidityThresholds));
+                if (data.marketRates) localStorage.setItem('sf_marketRates', JSON.stringify(data.marketRates));
+                if (data.profitMargin !== undefined) localStorage.setItem('sf_profitMargin', data.profitMargin.toString());
+                if (data.rateHistory) localStorage.setItem('sf_rateHistory', JSON.stringify(data.rateHistory));
+                if (data.poolOrder) localStorage.setItem('sf_poolOrder', JSON.stringify(data.poolOrder));
+                if (data.rateOrder) localStorage.setItem('sf_rateOrder', JSON.stringify(data.rateOrder));
+              } else if (!user.isAnonymous) {
+                const localTx = JSON.parse(localStorage.getItem('sf_transactions')) || transactions;
+                if (localTx.length > 0) {
+                  const localBal = JSON.parse(localStorage.getItem('sf_openingBalances')) || openingBalances;
+                  const localThresh = JSON.parse(localStorage.getItem('sf_liquidityThresholds')) || liquidityThresholds;
+                  const localRates = JSON.parse(localStorage.getItem('sf_marketRates')) || marketRates;
+                  const localMargin = parseFloat(localStorage.getItem('sf_profitMargin')) || profitMargin;
+                  const localRateHistory = JSON.parse(localStorage.getItem('sf_rateHistory')) || rateHistory;
+                  const localPoolOrder = JSON.parse(localStorage.getItem('sf_poolOrder')) || poolOrder;
+                  const localRateOrder = JSON.parse(localStorage.getItem('sf_rateOrder')) || rateOrder;
+
+                  setDoc(docRef, {
+                      transactions: localTx, openingBalances: localBal, liquidityThresholds: localThresh,
+                      marketRates: localRates, profitMargin: localMargin, rateHistory: localRateHistory,
+                      poolOrder: localPoolOrder, rateOrder: localRateOrder
+                  }, { merge: true }).catch(err => setSyncStatus('DB Locked by Rules'));
+                }
+              }
+            }, (err) => {
+              console.error("Cloud Sync Error:", err);
+              setSyncStatus('DB Locked by Rules');
+            });
+            return () => unsub();
+          }, [user]);
+
+          const saveStateToCloud = async (updates) => {
+            if (updates.transactions) localStorage.setItem('sf_transactions', JSON.stringify(updates.transactions));
+            if (updates.openingBalances) localStorage.setItem('sf_openingBalances', JSON.stringify(updates.openingBalances));
+            if (updates.liquidityThresholds) localStorage.setItem('sf_liquidityThresholds', JSON.stringify(updates.liquidityThresholds));
+            if (updates.marketRates) localStorage.setItem('sf_marketRates', JSON.stringify(updates.marketRates));
+            if (updates.profitMargin !== undefined) localStorage.setItem('sf_profitMargin', updates.profitMargin.toString());
+            if (updates.rateHistory) localStorage.setItem('sf_rateHistory', JSON.stringify(updates.rateHistory));
+            if (updates.poolOrder) localStorage.setItem('sf_poolOrder', JSON.stringify(updates.poolOrder));
+            if (updates.rateOrder) localStorage.setItem('sf_rateOrder', JSON.stringify(updates.rateOrder));
+
+            if (!user || !db) return;
+            const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'appData', 'state');
+            try {
+              setSyncStatus('Syncing...');
+              await setDoc(docRef, updates, { merge: true });
+              setSyncStatus('Synced');
+            } catch (err) {
+              console.error("Failed to sync to cloud:", err);
+              setSyncStatus('DB Locked by Rules');
+            }
+          };
+
+          const movePool = (idx, dir) => {
+              const newOrder = [...poolOrder];
+              if (dir === -1 && idx > 0) [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
+              else if (dir === 1 && idx < newOrder.length - 1) [newOrder[idx + 1], newOrder[idx]] = [newOrder[idx], newOrder[idx + 1]];
+              setPoolOrder(newOrder); saveStateToCloud({ poolOrder: newOrder });
+          };
+
+          const moveRate = (idx, dir) => {
+              const newOrder = [...rateOrder];
+              if (dir === -1 && idx > 0) [newOrder[idx - 1], newOrder[idx]] = [newOrder[idx], newOrder[idx - 1]];
+              else if (dir === 1 && idx < newOrder.length - 1) [newOrder[idx + 1], newOrder[idx]] = [newOrder[idx], newOrder[idx + 1]];
+              setRateOrder(newOrder); saveStateToCloud({ rateOrder: newOrder });
+          };
+
+          const filteredLog = useMemo(() => {
+            if (!logDateFilter) return transactions;
+            const targetDate = new Date(logDateFilter).toDateString();
+            return transactions.filter(tx => new Date(tx.date).toDateString() === targetDate);
+          }, [transactions, logDateFilter]);
+
+          // --- MARKET & ALERT STATES ---
+          const [livePrices, setLivePrices] = useState({ DXY: 104.50, USDTHB: 32.38, CNYTHB: 4.52, USDCNY: 7.23, USDVND: 25400 });
+          const [priceDirections, setPriceDirections] = useState({ DXY: 'up', USDTHB: 'down', CNYTHB: 'up', USDCNY: 'up', USDVND: 'up' });
+          const [alerts, setAlerts] = useState([]);
+          const [showAlertModal, setShowAlertModal] = useState(false);
+          const [newAlert, setNewAlert] = useState({ asset: 'USDTHB', condition: 'above', price: '' });
+          const [selectedChart, setSelectedChart] = useState(null);
+          const prevPricesRef = useRef(livePrices);
+
+          useEffect(() => {
+            const fetchRealRates = async () => {
+              let updatedPrices = { ...prevPricesRef.current };
+              let dirs = { ...priceDirections };
+
+              try {
+                const fiatRes = await fetch('https://open.er-api.com/v6/latest/USD');
+                if (fiatRes.ok) {
+                  const fiatData = await fiatRes.json();
+                  if (!updatedPrices.USDTHB || updatedPrices.USDTHB === prevPricesRef.current.USDTHB) updatedPrices.USDTHB = fiatData.rates.THB;
+                  if (!updatedPrices.USDCNY || updatedPrices.USDCNY === prevPricesRef.current.USDCNY) updatedPrices.USDCNY = fiatData.rates.CNY;
+                  if (!updatedPrices.USDVND || updatedPrices.USDVND === prevPricesRef.current.USDVND) updatedPrices.USDVND = fiatData.rates.VND;
+                  if (!updatedPrices.CNYTHB || updatedPrices.CNYTHB === prevPricesRef.current.CNYTHB) updatedPrices.CNYTHB = fiatData.rates.THB / fiatData.rates.CNY;
+                }
+              } catch (err) {}
+
+              const fetchYF = async (symbol, key) => {
+                try {
+                  const url = encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`);
+                  const res = await fetch(`https://api.allorigins.win/raw?url=${url}`);
+                  if (res.ok) {
+                      const data = await res.json();
+                      if (data.chart?.result?.[0]?.meta?.regularMarketPrice) {
+                          updatedPrices[key] = data.chart.result[0].meta.regularMarketPrice;
+                      }
+                  }
+                } catch (e) {}
+              };
+
+              await Promise.all([
+                fetchYF('DX-Y.NYB', 'DXY'), fetchYF('THB=X', 'USDTHB'), fetchYF('CNYTHB=X', 'CNYTHB'),
+                fetchYF('CNY=X', 'USDCNY'), fetchYF('VND=X', 'USDVND')
+              ]);
+
+              Object.keys(updatedPrices).forEach(key => {
+                if (updatedPrices[key] > prevPricesRef.current[key]) dirs[key] = 'up';
+                else if (updatedPrices[key] < prevPricesRef.current[key]) dirs[key] = 'down';
+              });
+
+              prevPricesRef.current = updatedPrices;
+              setLivePrices(updatedPrices);
+              setPriceDirections(dirs);
+            };
+
+            fetchRealRates();
+            const interval = setInterval(fetchRealRates, 15000);
+            return () => clearInterval(interval);
+          }, []);
+
+          useEffect(() => {
+            alerts.forEach(alertItem => {
+              if (!alertItem.active) return;
+              const currentPrice = livePrices[alertItem.asset];
+              const triggered = alertItem.condition === 'above' ? currentPrice >= alertItem.price : currentPrice <= alertItem.price;
+              if (triggered) {
+                if (window.Notification && Notification.permission === 'granted') {
+                  new Notification(`🚨 LFX Alert: ${alertItem.asset}`, {
+                    body: `${alertItem.asset} crossed target ${formatDisplay(alertItem.price)}!`,
+                    icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Black_icon_-_financial_investment.svg/512px-Black_icon_-_financial_investment.svg.png'
+                  });
+                } else if (window.navigator?.vibrate) window.navigator.vibrate([200, 100, 200, 100, 500]);
+                setAlerts(prev => prev.map(a => a.id === alertItem.id ? { ...a, active: false } : a));
+              }
+            });
+          }, [livePrices, alerts]);
+
+          const handleOpenAlertModal = () => {
+            if (window.Notification && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+              Notification.requestPermission();
+            }
+            setShowAlertModal(true);
+          };
+
+          const handleSaveAlert = () => {
+            if (!newAlert.price) return;
+            setAlerts(prev => [{ ...newAlert, id: Date.now(), active: true, price: parseFloat(newAlert.price) }, ...prev]);
+            setShowAlertModal(false);
+            setNewAlert({ ...newAlert, price: '' });
+          };
+
+          const handleGoogleSignIn = async () => {
+            try {
+              const provider = new GoogleAuthProvider();
+              await signInWithPopup(auth, provider);
+              setShowLoginModal(false);
+            } catch (err) { alert(`Sign in failed: ${err.message}`); }
+          };
+
+          const triggerHaptic = () => { if (window.navigator?.vibrate) window.navigator.vibrate(15); };
+
+          const isOperator = (val) => ['+', '-', '×', '÷'].includes(val);
+
+          const evaluateTokens = (tokensArray) => {
+            if (!tokensArray || tokensArray.length === 0) return '0';
+            let validTokens = [...tokensArray];
+            if (isOperator(validTokens[validTokens.length - 1])) validTokens.pop();
+            if (validTokens.length === 0) return '0';
+
+            const doMath = (a, b, op) => {
+                const numA = parseFloat(a); const numB = parseFloat(b);
+                if (isNaN(numA) || isNaN(numB)) return 0;
+                switch(op) {
+                    case '+': return numA + numB; case '-': return numA - numB;
+                    case '×': return numA * numB; case '÷': return numB === 0 ? 'Error' : numA / numB;
+                    default: return 0;
+                }
+            };
+
+            try {
+                let p1 = [];
+                for (let i = 0; i < validTokens.length; i++) {
+                    const t = validTokens[i];
+                    if (t === '×' || t === '÷') {
+                        const prev = p1.pop(); const next = validTokens[i + 1];
+                        if (next === undefined) { p1.push(prev); break; }
+                        const res = doMath(prev, next, t);
+                        if (res === 'Error') return 'Error';
+                        p1.push(String(res)); i++;
+                    } else p1.push(t);
+                }
+
+                let p2 = [];
+                for (let i = 0; i < p1.length; i++) {
+                    const t = p1[i];
+                    if (t === '+' || t === '-') {
+                        const prev = p2.pop(); const next = p1[i + 1];
+                        if (next === undefined) { p2.push(prev); break; }
+                        const res = doMath(prev, next, t);
+                        p2.push(String(res)); i++;
+                    } else p2.push(t);
+                }
+                const finalRes = parseFloat(p2[0]);
+                if (isNaN(finalRes)) return 'Error';
+                // Cap to 10 significant digits to prevent endless decimals overflowing the screen
+                return String(parseFloat(finalRes.toPrecision(10)));
+            } catch (e) { return 'Error'; }
+          };
+
+          const runningTotal = evaluateTokens(tokens);
+
+          const formatDisplay = (val, isCurrency = false) => {
+            if (val === 'Error') return val;
+            let strVal = typeof val === 'number' ? (isCurrency ? String(Number(val.toFixed(2))) : String(val)) : String(val);
+            if (strVal.includes('e')) return strVal;
+            const isNegative = strVal.startsWith('-');
+            if (isNegative) strVal = strVal.substring(1);
+            let [intPart, decPart] = strVal.split('.');
+            if (intPart) intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            let result = intPart;
+            if (decPart !== undefined) result += '.' + decPart;
+            else if (strVal.endsWith('.') && !isCurrency) result += '.';
+            return isNegative ? '-' + result : result;
+          };
+
+          const handleDigit = (d) => {
+            triggerHaptic();
+            if (justEvaluated) {
+                setTokens([d]);
+                setJustEvaluated(false);
+                setUsedPercentage(false);
+                setIsFeePatternDetected(false);
+                setCursorIndex(null);
+                return;
+            }
+            if (cursorIndex !== null) {
+                setTokens(prev => {
+                    const next = [...prev];
+                    if (next[cursorIndex] === '0') next[cursorIndex] = d;
+                    else next[cursorIndex] += d;
+                    return next;
+                });
+                return;
+            }
+            setTokens(prev => {
+              const next = [...prev]; const last = next[next.length - 1];
+              if (isOperator(last)) next.push(d);
+              else {
+                if (last === '0') next[next.length - 1] = d;
+                else next[next.length - 1] = last + d;
+              }
+              return next;
+            });
+          };
+
+          const handleDecimal = () => {
+            triggerHaptic();
+            if (justEvaluated) {
+                setTokens(['0.']);
+                setJustEvaluated(false);
+                setUsedPercentage(false);
+                setIsFeePatternDetected(false);
+                setCursorIndex(null);
+                return;
+            }
+            if (cursorIndex !== null) {
+                setTokens(prev => {
+                    const next = [...prev];
+                    if (!next[cursorIndex].includes('.')) next[cursorIndex] += '.';
+                    return next;
+                });
+                return;
+            }
+            setTokens(prev => {
+              const next = [...prev]; const last = next[next.length - 1];
+              if (isOperator(last)) next.push('0.');
+              else if (!last.includes('.')) next[next.length - 1] = last + '.';
+              return next;
+            });
+          };
+
+          const handleOperator = (op) => {
+            triggerHaptic(); setJustEvaluated(false); setCursorIndex(null);
+            setTokens(prev => {
+              const next = [...prev]; const last = next[next.length - 1];
+              if (isOperator(last)) next[next.length - 1] = op;
+              else next.push(op);
+              return next;
+            });
+          };
+
+          const handleEqual = () => {
+            triggerHaptic(); setCursorIndex(null);
+            const res = evaluateTokens(tokens);
+            if (res === 'Error') return;
+            const formattedEq = tokens.map(t => isOperator(t) ? t : formatDisplay(t)).join('');
+            const fullEq = `${formattedEq}=${formatDisplay(res)}`;
+            setHistory(prev => [{ fullEquation: fullEq, result: res, tokens: [...tokens] }, ...prev]);
+            setTokens([res]);
+            setJustEvaluated(true);
+          };
+
+          const handleClear = () => {
+            triggerHaptic();
+            setTokens(['0']);
+            setJustEvaluated(false);
+            setUsedPercentage(false);
+            setIsFeePatternDetected(false);
+            setCursorIndex(null);
+          };
+
+          const handleToggleSign = () => {
+            triggerHaptic(); setJustEvaluated(false);
+            if (cursorIndex !== null) {
+                setTokens(prev => {
+                    const next = [...prev];
+                    const last = next[cursorIndex];
+                    if (last.startsWith('-')) next[cursorIndex] = last.substring(1);
+                    else if (last !== '0') next[cursorIndex] = '-' + last;
+                    return next;
+                });
+                return;
+            }
+            setTokens(prev => {
+              const next = [...prev]; const last = next[next.length - 1];
+              if (!isOperator(last)) {
+                if (last.startsWith('-')) next[next.length - 1] = last.substring(1);
+                else if (last !== '0') next[next.length - 1] = '-' + last;
+              }
+              return next;
+            });
+          };
+
+          const handleBackspace = () => {
+            triggerHaptic(); setJustEvaluated(false);
+            if (cursorIndex !== null) {
+                setTokens(prev => {
+                    const next = [...prev];
+                    const last = next[cursorIndex];
+                    if (last.length > 1) {
+                        const sliced = last.slice(0, -1);
+                        if (sliced === '-' || sliced === '-0') next[cursorIndex] = '0';
+                        else next[cursorIndex] = sliced;
+                    } else {
+                        next[cursorIndex] = '0';
+                    }
+                    return next;
+                });
+                return;
+            }
+            if (tokens.length === 1 && tokens[0].length <= 1) {
+              setUsedPercentage(false);
+              setIsFeePatternDetected(false);
+            }
+            setTokens(prev => {
+              const next = [...prev]; const last = next[next.length - 1];
+              if (isOperator(last)) { next.pop(); return next.length === 0 ? ['0'] : next; }
+              if (last.length > 1) {
+                const sliced = last.slice(0, -1);
+                if (sliced === '-' || sliced === '-0') { if (next.length > 1) next.pop(); else next[0] = '0'; }
+                else next[next.length - 1] = sliced;
+              } else { if (next.length > 1) next.pop(); else next[0] = '0'; }
+              return next;
+            });
+          };
+
+          const handlePercentage = () => {
+            triggerHaptic(); setJustEvaluated(false); setCursorIndex(null);
+            setUsedPercentage(true); // SMART: Triggers the Auto-Transfer Switcher
+            setTokens(prev => {
+              const next = [...prev]; const last = next[next.length - 1];
+              if (!isOperator(last)) {
+                const val = parseFloat(last);
+                if (next.length >= 3) {
+                  const op = next[next.length - 2];
+                  if (op === '+' || op === '-') {
+                    const baseTokens = next.slice(0, -2);
+                    const baseValue = parseFloat(evaluateTokens(baseTokens));
+                    next[next.length - 1] = String(baseValue * (val / 100));
+                  } else {
+                    next[next.length - 1] = String(val / 100);
+                  }
+                } else {
+                  next[next.length - 1] = String(val / 100);
+                }
+              }
+              return next;
+            });
+          };
+
+          const getDisplayText = () => tokens.map(t => isOperator(t) ? t : formatDisplay(t)).join('');
+          const getClipboardText = () => justEvaluated && history.length > 0 ? history[0].fullEquation : getDisplayText();
+
+          const copyMainDisplayAndSave = () => {
+            const textToCopy = getClipboardText();
+            const el = document.createElement("textarea"); el.value = textToCopy; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el);
+            setMainCopied(true); setTimeout(() => setMainCopied(false), 2000);
+            handleOpenSaveModal();
+          };
+
+          const guessCurrencyFromRate = (val) => {
+            const isWithinMargin = (value, target) => value >= target * 0.97 && value <= target * 1.03;
+            const usdRate = marketRates.USD || 22000;
+            const thbRate = marketRates.THB || 700;
+            const cnyRate = marketRates.CNY || 3100;
+            const usdThbRate = usdRate / thbRate;
+
+            if (isWithinMargin(val, usdRate)) return { rate: val, unitCur: 'USD', resCur: 'LAK', priority: 4 };
+            if (isWithinMargin(val, thbRate)) return { rate: val, unitCur: 'THB', resCur: 'LAK', priority: 3 };
+            if (isWithinMargin(val, cnyRate)) return { rate: val, unitCur: 'CNY', resCur: 'LAK', priority: 2 };
+            if (isWithinMargin(val, usdThbRate)) return { rate: val, unitCur: 'USD', resCur: 'THB', priority: 1 };
+            return null;
+          };
+
+          const handleSwapRateAmt = () => {
+            setQuickTx(prev => {
+              if (prev.isManual || !prev.unitAmt || !prev.rate) return prev;
+              const newRate = prev.unitAmt;
+              const newUnitAmt = prev.rate;
+              let newUnitCur = prev.unitCur;
+              let newResCur = prev.resCur;
+
+              const guess = guessCurrencyFromRate(parseFloat(newRate));
+              if (guess) { newUnitCur = guess.unitCur; newResCur = guess.resCur; }
+
+              return { ...prev, rate: newRate, unitAmt: newUnitAmt, unitCur: newUnitCur, resCur: newResCur };
+            });
+          };
+
+          const handleOpenSaveModal = () => {
+            let evalResult = parseFloat(evaluateTokens(tokens));
+            let eqTokens = [...tokens];
+
+            if (justEvaluated && history.length > 0) {
+              eqTokens = history[0].tokens; evalResult = parseFloat(history[0].result);
+            } else if (tokens.length >= 3 && !justEvaluated) {
+              const formattedEq = eqTokens.map(t => isOperator(t) ? t : formatDisplay(t)).join('');
+              const fullEq = `${formattedEq}=${formatDisplay(evalResult)}`;
+              setHistory(prev => [{ fullEquation: fullEq, result: String(evalResult), tokens: [...eqTokens] }, ...prev]);
+              setTokens([String(evalResult)]); setJustEvaluated(true);
+            }
+            if (isNaN(evalResult) || evalResult === 0) return;
+
+            // SMART: Auto-Detect Fee Pattern (e.g., 55000 + 200 or 55000 - 200 where fee is <= 4%)
+            let feePatternFound = false;
+            let lastPlus = eqTokens.lastIndexOf('+');
+            let lastMinus = eqTokens.lastIndexOf('-');
+            let opIdx = Math.max(lastPlus, lastMinus);
+
+            if (opIdx > 0 && opIdx === eqTokens.length - 2) {
+               const baseVal = Math.abs(parseFloat(evaluateTokens(eqTokens.slice(0, opIdx))));
+               const feeVal = Math.abs(parseFloat(String(eqTokens[opIdx + 1]).replace(/,/g, '')));
+               // Check if fee is between 0% and 4% of the base value
+               if (baseVal > 0 && feeVal > 0 && (feeVal / baseVal) <= 0.04) {
+                   feePatternFound = true;
+                   setIsFeePatternDetected(true);
+               }
+            }
+
+            // SMART: Toggles Transfer mode automatically if % was used OR fee pattern detected
+            setTransferTx(prev => ({ ...prev, amt: String(evalResult) }));
+            setSaveMode((usedPercentage || feePatternFound) ? 'transfer' : 'exchange');
+
+            let r_rate = '', r_unitAmt = '', r_resAmt = evalResult, r_unitCur = 'USD', r_resCur = 'LAK';
+            let detected = false;
+            const multDivIdx = eqTokens.findIndex(t => t === '×' || t === '÷');
+            if (multDivIdx !== -1) {
+              const a = parseFloat(String(eqTokens[multDivIdx - 1]).replace(/,/g, ''));
+              const b = parseFloat(String(eqTokens[multDivIdx + 1]).replace(/,/g, ''));
+              const guessA = guessCurrencyFromRate(a);
+              const guessB = guessCurrencyFromRate(b);
+
+              let bestGuess = null; let unitAmtVal = 0;
+
+              if (guessA && guessB) {
+                if (guessA.priority >= guessB.priority) { bestGuess = guessA; unitAmtVal = b; }
+                else { bestGuess = guessB; unitAmtVal = a; }
+              } else if (guessA) { bestGuess = guessA; unitAmtVal = b; }
+              else if (guessB) { bestGuess = guessB; unitAmtVal = a; }
+
+              if (bestGuess) {
+                r_rate = bestGuess.rate; r_unitCur = bestGuess.unitCur; r_resCur = bestGuess.resCur;
+                if (eqTokens[multDivIdx] === '×') { r_unitAmt = unitAmtVal; r_resAmt = evalResult; }
+                else if (eqTokens[multDivIdx] === '÷') { r_unitAmt = evalResult; r_resAmt = a; }
+                detected = true;
+              }
+            }
+            if (!detected) { r_resAmt = evalResult; r_unitAmt = ''; r_rate = ''; r_unitCur = 'USD'; r_resCur = 'LAK'; }
+            setQuickTx({ unitAmt: r_unitAmt, resAmt: r_resAmt, rate: r_rate, unitCur: r_unitCur, resCur: r_resCur, isManual: !detected });
+
+            setShowSaveModal(true);
+          };
+
+          const saveQuickTx = (direction) => {
+            if (txSuccess) return;
+            setTxSuccess(true);
+            setTimeout(() => {
+                const newTx = { id: Date.now(), date: new Date().toISOString(), rate: parseFloat(quickTx.rate) || 0 };
+                if (direction === 'receive_unit') {
+                  newTx.receiveAmt = parseFloat(quickTx.unitAmt) || 0; newTx.receiveCur = quickTx.unitCur;
+                  newTx.sendAmt = parseFloat(quickTx.resAmt) || 0;    newTx.sendCur = quickTx.resCur;
+                } else {
+                  newTx.receiveAmt = parseFloat(quickTx.resAmt) || 0; newTx.receiveCur = quickTx.resCur;
+                  newTx.sendAmt = parseFloat(quickTx.unitAmt) || 0;    newTx.sendCur = quickTx.unitCur;
+                }
+                const updatedList = [newTx, ...transactions];
+                setTransactions(updatedList); saveStateToCloud({ transactions: updatedList });
+            }, 10);
+            setTimeout(() => { setTxSuccess(false); setShowSaveModal(false); handleClear(); }, 1500);
+          };
+
+          // NEW: Transfer Save Logic
+          const saveTransferTx = (direction) => {
+            if (txSuccess) return;
+            setTxSuccess(true);
+            setTimeout(() => {
+                const amt = parseFloat(transferTx.amt) || 0;
+                const newTx = {
+                    id: Date.now(),
+                    date: new Date().toISOString(),
+                    isTransfer: true,
+                    rate: 0
+                };
+                if (direction === 'in') {
+                    newTx.receiveAmt = amt; newTx.receiveCur = transferTx.cur;
+                    newTx.sendAmt = 0; newTx.sendCur = 'SYS';
+                } else {
+                    newTx.receiveAmt = 0; newTx.receiveCur = 'SYS';
+                    newTx.sendAmt = amt; newTx.sendCur = transferTx.cur;
+                }
+                const updatedList = [newTx, ...transactions];
+                setTransactions(updatedList); saveStateToCloud({ transactions: updatedList });
+            }, 10);
+            setTimeout(() => { setTxSuccess(false); setShowSaveModal(false); handleClear(); }, 1500);
+          };
+
+          const analyzeChatImage = async (base64Data, mimeType) => {
+            const prompt = `You are a data extraction assistant for a money exchange business. Analyze this chat screenshot and extract the currency exchange transaction details. The supported currencies are USD, USDT, THB, CNY (foreign currencies) and LAK, THB (local settlement currencies). Return ONLY a single valid JSON object, with no extra text, in this exact shape:
+{
+  "unitAmt": "<the foreign currency amount being exchanged, digits only, no commas>",
+  "rate": "<the exchange rate, digits only, no commas>",
+  "resAmt": "<the resulting total amount, digits only, no commas>",
+  "unitCur": "<one of USD, USDT, THB, CNY>",
+  "resCur": "<one of LAK, THB>"
+}
+If any value cannot be determined from the image, use an empty string "" for that field. Do not guess wildly. Do not include explanations, markdown, or code fences — output the raw JSON object only.`;
+            let data = null; let responseText = "{}";
+            try {
+              if (isCanvas) {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=`;
+                const payload = { contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { mimeType: mimeType, data: base64Data } }] }] };
+                const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
+                if (!res.ok) throw new Error("Canvas API Error");
+                data = await res.json(); responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+              } else {
+                const openRouterApiKey = "PASTE_YOUR_OPENROUTER_API_KEY_HERE";
+                const url = "https://openrouter.ai/api/v1/chat/completions";
+                const payload = { model: "google/gemini-2.5-flash", messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Data}` } }] }] };
+                const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openRouterApiKey}`, 'HTTP-Referer': window.location.origin, 'X-Title': 'Smart finEx' }, body: JSON.stringify(payload) });
+                if (!res.ok) { const errBody = await res.json().catch(() => ({})); throw new Error(errBody?.error?.message || `OpenRouter Error ${res.status}`); }
+                data = await res.json(); responseText = data.choices?.[0]?.message?.content || "{}";
+              }
+              const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+              if (jsonMatch) {
+                const parsed = JSON.parse(jsonMatch[0]);
+                setQuickTx({ unitAmt: parsed.unitAmt || '', rate: parsed.rate || '', resAmt: parsed.resAmt || '', unitCur: parsed.unitCur || 'USD', resCur: parsed.resCur || 'LAK', isManual: !(parsed.unitAmt && parsed.rate) });
+              } else { setQuickTx({ unitAmt: '', resAmt: '', rate: '', unitCur: 'USD', resCur: 'LAK', isManual: true }); }
+            } catch (err) { alert(`Scan Error: ${err.message}`); setQuickTx({ unitAmt: '', resAmt: '', rate: '', unitCur: 'USD', resCur: 'LAK', isManual: true }); }
+            finally { setIsScanning(false); setSaveMode('exchange'); setShowSaveModal(true); }
+          };
+
+          const handleImageUpload = (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+            setIsScanning(true);
+            const reader = new FileReader();
+            reader.onloadend = async () => { await analyzeChatImage(reader.result.split(',')[1], file.type); };
+            reader.readAsDataURL(file);
+            event.target.value = null;
+          };
+
+          const handleDeleteTx = (id) => {
+            const updatedList = transactions.filter(tx => tx.id !== id);
+            setTransactions(updatedList); saveStateToCloud({ transactions: updatedList });
+          };
+          const executeDelete = () => { if (!txToDelete) return; handleDeleteTx(txToDelete); setTxToDelete(null); };
+
+          const generateReportText = (dateStr) => {
+            const target = new Date(dateStr);
+            const startOfDay = new Date(target.getFullYear(), target.getMonth(), target.getDate()).getTime();
+            const endOfDay = startOfDay + (24 * 60 * 60 * 1000) - 1;
+
+            const safeTx = Array.isArray(transactions) ? transactions : [];
+            const sortedTx = [...safeTx].sort((a,b) => new Date(a.date) - new Date(b.date));
+
+            const getHistoricalConfigRate = (cur, ts) => {
+                if (cur === 'LAK') return 1;
+                const sortedHistory = [...rateHistory].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                let rate = null;
+                for (let i = sortedHistory.length - 1; i >= 0; i--) {
+                    if (new Date(sortedHistory[i].date).getTime() <= ts) { rate = sortedHistory[i].rates[cur]; if (rate) break; }
+                }
+                return rate || marketRates[cur] || 0;
+            };
+
+            const eodRates = { USD: getHistoricalConfigRate('USD', endOfDay), USDT: getHistoricalConfigRate('USDT', endOfDay), THB: getHistoricalConfigRate('THB', endOfDay), CNY: getHistoricalConfigRate('CNY', endOfDay) };
+            const bodRates = { USD: getHistoricalConfigRate('USD', startOfDay - 1), USDT: getHistoricalConfigRate('USDT', startOfDay - 1), THB: getHistoricalConfigRate('THB', startOfDay - 1), CNY: getHistoricalConfigRate('CNY', startOfDay - 1) };
+
+            let fifoQueues = { USD: { lakBuy: [], lakSell: [], thbBuy: [], thbSell: [] }, USDT: { lakBuy: [], lakSell: [], thbBuy: [], thbSell: [] }, THB: { lakBuy: [], lakSell: [] }, CNY: { lakBuy: [], lakSell: [], thbBuy: [], thbSell: [] } };
+            let dayWPLAK = 0; let dayWPTHB = 0;
+
+            let bodBal = { LAK: Number(openingBalances.LAK)||0, USD: Number(openingBalances.USD)||0, USDT: Number(openingBalances.USDT)||0, THB: Number(openingBalances.THB)||0, CNY: Number(openingBalances.CNY)||0 };
+            let eodBal = { ...bodBal };
+            let dayTxList = [];
+
+            sortedTx.forEach(tx => {
+                const txTime = new Date(tx.date).getTime();
+                if (txTime > endOfDay) return;
+
+                if (txTime < startOfDay) {
+                    if (tx.receiveCur && bodBal[tx.receiveCur] !== undefined) bodBal[tx.receiveCur] += tx.receiveAmt;
+                    if (tx.sendCur && bodBal[tx.sendCur] !== undefined) bodBal[tx.sendCur] -= tx.sendAmt;
+                }
+
+                if (tx.receiveCur && eodBal[tx.receiveCur] !== undefined) eodBal[tx.receiveCur] += tx.receiveAmt;
+                if (tx.sendCur && eodBal[tx.sendCur] !== undefined) eodBal[tx.sendCur] -= tx.sendAmt;
+
+                const isTargetDay = txTime >= startOfDay && txTime <= endOfDay;
+                if (isTargetDay) dayTxList.push(tx);
+
+                // Transfer Working Profit (Intra-currency profits)
+                if (tx.isTransfer && isTargetDay) {
+                    if (tx.receiveCur !== 'SYS') {
+                        if (tx.receiveCur === 'THB') dayWPTHB += tx.receiveAmt;
+                        else dayWPLAK += tx.receiveAmt * (tx.receiveCur === 'LAK' ? 1 : eodRates[tx.receiveCur] || 0);
+                    }
+                    if (tx.sendCur !== 'SYS') {
+                        if (tx.sendCur === 'THB') dayWPTHB -= tx.sendAmt;
+                        else dayWPLAK -= tx.sendAmt * (tx.sendCur === 'LAK' ? 1 : eodRates[tx.sendCur] || 0);
+                    }
+                }
+                // Exchange Working Profit (FIFO)
+                else if (!tx.isTransfer && !tx.isAdjustment) {
+                    let txWPLAK = 0; let txWPTHB = 0;
+                    ['USD', 'USDT', 'THB', 'CNY'].forEach(cur => {
+                      if (tx.sendCur === 'LAK' && tx.receiveCur === cur) {
+                        let rate = tx.sendAmt / tx.receiveAmt; let remaining = tx.receiveAmt;
+                        while (remaining > 0 && fifoQueues[cur].lakSell.length > 0) {
+                            let sell = fifoQueues[cur].lakSell[0]; let matchAmt = Math.min(remaining, sell.amt);
+                            txWPLAK += matchAmt * (sell.rate - rate);
+                            sell.amt -= matchAmt; remaining -= matchAmt;
+                            if (sell.amt === 0) fifoQueues[cur].lakSell.shift();
+                        }
+                        if (remaining > 0) fifoQueues[cur].lakBuy.push({ amt: remaining, rate: rate });
+                      }
+                      else if (tx.receiveCur === 'LAK' && tx.sendCur === cur) {
+                        let rate = tx.receiveAmt / tx.sendAmt; let remaining = tx.sendAmt;
+                        while (remaining > 0 && fifoQueues[cur].lakBuy.length > 0) {
+                            let buy = fifoQueues[cur].lakBuy[0]; let matchAmt = Math.min(remaining, buy.amt);
+                            txWPLAK += matchAmt * (rate - buy.rate);
+                            buy.amt -= matchAmt; remaining -= matchAmt;
+                            if (buy.amt === 0) fifoQueues[cur].lakBuy.shift();
+                        }
+                        if (remaining > 0) fifoQueues[cur].lakSell.push({ amt: remaining, rate: rate });
+                      }
+                      if (cur !== 'THB') {
+                        if (tx.sendCur === 'THB' && tx.receiveCur === cur) {
+                          let rate = tx.sendAmt / tx.receiveAmt; let remaining = tx.receiveAmt;
+                          while (remaining > 0 && fifoQueues[cur].thbSell.length > 0) {
+                              let sell = fifoQueues[cur].thbSell[0]; let matchAmt = Math.min(remaining, sell.amt);
+                              txWPTHB += matchAmt * (sell.rate - rate);
+                              sell.amt -= matchAmt; remaining -= matchAmt;
+                              if (sell.amt === 0) fifoQueues[cur].thbSell.shift();
+                          }
+                          if (remaining > 0) fifoQueues[cur].thbBuy.push({ amt: remaining, rate: rate });
+                        }
+                        else if (tx.receiveCur === 'THB' && tx.sendCur === cur) {
+                          let rate = tx.receiveAmt / tx.sendAmt; let remaining = tx.sendAmt;
+                          while (remaining > 0 && fifoQueues[cur].thbBuy.length > 0) {
+                              let buy = fifoQueues[cur].thbBuy[0]; let matchAmt = Math.min(remaining, buy.amt);
+                              txWPTHB += matchAmt * (rate - buy.rate);
+                              buy.amt -= matchAmt; remaining -= matchAmt;
+                              if (buy.amt === 0) fifoQueues[cur].thbBuy.shift();
+                          }
+                          if (remaining > 0) fifoQueues[cur].thbSell.push({ amt: remaining, rate: rate });
+                        }
+                      }
+                    });
+                    if (isTargetDay) { dayWPLAK += txWPLAK; dayWPTHB += txWPTHB; }
+                }
+            });
+
+            const totalDayWP = dayWPLAK + (dayWPTHB * (eodRates.THB || 0));
+            const eodTotalLAK = (eodBal.LAK||0) + (eodBal.USD||0)*(eodRates.USD||0) + (eodBal.USDT||0)*(eodRates.USDT||0) + (eodBal.THB||0)*(eodRates.THB||0) + (eodBal.CNY||0)*(eodRates.CNY||0);
+            const bodTotalLAK = (bodBal.LAK||0) + (bodBal.USD||0)*(bodRates.USD||0) + (bodBal.USDT||0)*(bodRates.USDT||0) + (bodBal.THB||0)*(bodRates.THB||0) + (bodBal.CNY||0)*(bodRates.CNY||0);
+            const dailyCashGrowth = eodTotalLAK - bodTotalLAK;
+
+            let txt = `==================================\n   SMART FINEX - DAILY STATEMENT\n   Date: ${target.toLocaleDateString()}\n==================================\n\n`;
+            txt += `[ SUMMARY ]\nTotal Portfolio Value (EOD): ${formatDisplay(eodTotalLAK, true)} LAK\nUnrealized PnL: ${dailyCashGrowth >= 0 ? '+' : ''}${formatDisplay(dailyCashGrowth, true)} LAK\nDaily Working Profit: ${totalDayWP >= 0 ? '+' : ''}${formatDisplay(totalDayWP, true)} LAK\nTotal Transactions: ${dayTxList.length}\n\n`;
+            txt += `[ BALANCES (End of Day) ]\nUSD: ${formatDisplay(eodBal.USD, true)}\nUSDT: ${formatDisplay(eodBal.USDT, true)}\nTHB: ${formatDisplay(eodBal.THB, true)}\nCNY: ${formatDisplay(eodBal.CNY, true)}\nLAK: ${formatDisplay(eodBal.LAK, true)}\n\n`;
+            txt += `[ MARKET RATES APPLIED (EOD) ]\nUSD/LAK: ${formatDisplay(eodRates.USD)}\nUSDT/LAK: ${formatDisplay(eodRates.USDT)}\nTHB/LAK: ${formatDisplay(eodRates.THB)}\nCNY/LAK: ${formatDisplay(eodRates.CNY)}\n\n`;
+
+            txt += `[ TRANSACTION LOG ]\n`;
+            if (dayTxList.length === 0) txt += `No transactions on this date.\n`;
+            else {
+                dayTxList.reverse().forEach(tx => {
+                    const time = new Date(tx.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+                    if (tx.isAdjustment) {
+                        txt += `- [${time}] ID:${String(tx.id).slice(-4)} | Capital Adjustment\n`;
+                        if (tx.receiveCur !== 'SYS') txt += `  Added:    +${formatDisplay(tx.receiveAmt, true)} ${tx.receiveCur}\n`;
+                        if (tx.sendCur !== 'SYS') txt += `  Removed:  -${formatDisplay(tx.sendAmt, true)} ${tx.sendCur}\n`;
+                    } else if (tx.isTransfer) {
+                        txt += `- [${time}] ID:${String(tx.id).slice(-4)} | Transfer / Fee\n`;
+                        if (tx.receiveCur !== 'SYS') txt += `  Received: +${formatDisplay(tx.receiveAmt, true)} ${tx.receiveCur}\n`;
+                        if (tx.sendCur !== 'SYS') txt += `  Sent:     -${formatDisplay(tx.sendAmt, true)} ${tx.sendCur}\n`;
+                    } else {
+                        txt += `- [${time}] ID:${String(tx.id).slice(-4)} | ${tx.receiveCur}->${tx.sendCur} @${tx.rate||0}\n`;
+                        txt += `  Received: +${formatDisplay(tx.receiveAmt, true)} ${tx.receiveCur}\n`;
+                        txt += `  Sent:     -${formatDisplay(tx.sendAmt, true)} ${tx.sendCur}\n`;
+                    }
+                });
+            }
+            txt += `\n==================================\nGenerated by Smart finEx\n`;
+            return txt;
+          };
+
+          const handleDownloadReport = () => {
+              const text = generateReportText(exportDate);
+              const blob = new Blob([text], { type: 'text/plain' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a'); a.href = url; a.download = `SmartFinEx_Statement_${exportDate}.txt`;
+              document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+              setShowExportModal(false);
+          };
+
+          const handleCopyReport = () => {
+              const text = generateReportText(exportDate);
+              const el = document.createElement("textarea"); el.value = text; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el);
+              setShowExportModal(false);
+          };
+
+          const handleOpenLiquidityConfig = () => {
+            let net = { USD: 0, USDT: 0, THB: 0, CNY: 0, LAK: 0 };
+            transactions.forEach(tx => {
+              if (tx.receiveCur && net[tx.receiveCur] !== undefined) net[tx.receiveCur] += tx.receiveAmt;
+              if (tx.sendCur && net[tx.sendCur] !== undefined) net[tx.sendCur] -= tx.sendAmt;
+            });
+            const currentBalances = {};
+            const roundedThresholds = {};
+            poolOrder.forEach(cur => {
+              let bal = (parseFloat(openingBalances[cur]) || 0) + net[cur];
+              currentBalances[cur] = Number(bal.toFixed(2)).toString();
+              let th = parseFloat(liquidityThresholds[cur]) || 0;
+              roundedThresholds[cur] = Number(th.toFixed(2)).toString();
+            });
+            setConfigForm({ balances: currentBalances, thresholds: roundedThresholds, rates: { ...marketRates }, margin: (profitMargin * 100).toString() });
+            setShowLiquidityModal(true);
+            setTimeout(() => { const el = document.getElementById('config-scroll-container'); if (el) el.scrollTop = 0; }, 10);
+          };
+
+          const handleSaveLiquidityConfig = () => {
+            let net = { USD: 0, USDT: 0, THB: 0, CNY: 0, LAK: 0 };
+            transactions.forEach(tx => {
+              if (tx.receiveCur && net[tx.receiveCur] !== undefined) net[tx.receiveCur] += tx.receiveAmt;
+              if (tx.sendCur && net[tx.sendCur] !== undefined) net[tx.sendCur] -= tx.sendAmt;
+            });
+            const currentActualBalances = {};
+            poolOrder.forEach(cur => { currentActualBalances[cur] = (parseFloat(openingBalances[cur]) || 0) + net[cur]; });
+
+            const parsedThresholds = {}; const parsedRates = {};
+            const newTransactions = []; let ratesChanged = false; let i = 0;
+
+            poolOrder.forEach(cur => {
+              if (cur !== 'LAK') {
+                  parsedRates[cur] = parseFloat(configForm.rates[cur]) || marketRates[cur];
+                  if (parsedRates[cur] !== marketRates[cur]) ratesChanged = true;
+              }
+              const inputBal = configForm.balances[cur] !== '' && !isNaN(parseFloat(configForm.balances[cur])) ? parseFloat(configForm.balances[cur]) : 0;
+              const diff = inputBal - currentActualBalances[cur];
+              if (Math.abs(diff) > 0.001) {
+                  const newTx = { id: Date.now() + i, date: new Date().toISOString(), rate: 0, isAdjustment: true, note: 'Capital Adjustment' };
+                  if (diff > 0) { newTx.receiveAmt = diff; newTx.receiveCur = cur; newTx.sendAmt = 0; newTx.sendCur = 'SYS'; }
+                  else { newTx.sendAmt = Math.abs(diff); newTx.sendCur = cur; newTx.receiveAmt = 0; newTx.receiveCur = 'SYS'; }
+                  newTransactions.push(newTx);
+              }
+              parsedThresholds[cur] = parseFloat(configForm.thresholds[cur]) || 0; i++;
+            });
+
+            const parsedMargin = parseFloat(configForm.margin);
+            const newMargin = !isNaN(parsedMargin) ? parsedMargin / 100 : profitMargin;
+
+            let updatedList = transactions;
+            if (newTransactions.length > 0) { updatedList = [...newTransactions, ...transactions]; setTransactions(updatedList); }
+
+            let updatedRateHistory = rateHistory;
+            if (ratesChanged) {
+                updatedRateHistory = [...rateHistory, { date: new Date().toISOString(), rates: parsedRates }];
+                setRateHistory(updatedRateHistory);
+            }
+
+            setLiquidityThresholds(parsedThresholds); setMarketRates(parsedRates); setProfitMargin(newMargin);
+            saveStateToCloud({ transactions: updatedList, liquidityThresholds: parsedThresholds, marketRates: parsedRates, profitMargin: newMargin, rateHistory: updatedRateHistory });
+            setShowLiquidityModal(false);
+          };
+
+          // --- DASHBOARD REAL-TIME PROFIT, GROWTH & CHART LOGIC ---
+          const dashboardStats = useMemo(() => {
+            const now = new Date();
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+            const startOfWeek = startOfToday - (6 * 24 * 60 * 60 * 1000);
+            const startOfMonth = startOfToday - (29 * 24 * 60 * 60 * 1000);
+
+            let filterTime = 0;
+            if (chartFilter === '1D') filterTime = startOfToday;
+            if (chartFilter === '1W') filterTime = startOfWeek;
+            if (chartFilter === '1M') filterTime = startOfMonth;
+
+            const safeTx = Array.isArray(transactions) ? transactions : [];
+            const sortedTx = [...safeTx].sort((a,b) => new Date(a.date) - new Date(b.date));
+
+            const getHistoricalConfigRate = (cur, ts) => {
+                if (cur === 'LAK') return 1;
+                const sortedHistory = [...rateHistory].sort((a,b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+                let rate = null;
+                for (let i = sortedHistory.length - 1; i >= 0; i--) {
+                    if (new Date(sortedHistory[i].date).getTime() <= ts) { rate = sortedHistory[i].rates[cur]; if (rate) break; }
+                }
+                return rate || marketRates[cur] || 0;
+            };
+
+            const startRates = { USD: getHistoricalConfigRate('USD', filterTime - 1), USDT: getHistoricalConfigRate('USDT', filterTime - 1), THB: getHistoricalConfigRate('THB', filterTime - 1), CNY: getHistoricalConfigRate('CNY', filterTime - 1) };
+
+            const pastTx = sortedTx.filter(tx => new Date(tx.date).getTime() < filterTime);
+            const periodTx = sortedTx.filter(tx => new Date(tx.date).getTime() >= filterTime);
+
+            let startBal = { LAK: Number(openingBalances.LAK)||0, USD: Number(openingBalances.USD)||0, USDT: Number(openingBalances.USDT)||0, THB: Number(openingBalances.THB)||0, CNY: Number(openingBalances.CNY)||0 };
+            pastTx.forEach(tx => {
+              if (tx.receiveCur && startBal[tx.receiveCur] !== undefined) startBal[tx.receiveCur] += tx.receiveAmt;
+              if (tx.sendCur && startBal[tx.sendCur] !== undefined) startBal[tx.sendCur] -= tx.sendAmt;
+            });
+
+            const getStartVal = (bal) => (bal.LAK||0) + (bal.USD||0)*(startRates.USD||0) + (bal.USDT||0)*(startRates.USDT||0) + (bal.THB||0)*(startRates.THB||0) + (bal.CNY||0)*(startRates.CNY||0);
+            const startTotalCash = getStartVal(startBal);
+
+            let currentBal = { ...startBal };
+            periodTx.forEach(tx => {
+              if (tx.receiveCur && currentBal[tx.receiveCur] !== undefined) currentBal[tx.receiveCur] += tx.receiveAmt;
+              if (tx.sendCur && currentBal[tx.sendCur] !== undefined) currentBal[tx.sendCur] -= tx.sendAmt;
+            });
+
+            const getCurrentVal = (bal) => (bal.LAK||0) + (bal.USD||0)*(marketRates.USD||0) + (bal.USDT||0)*(marketRates.USDT||0) + (bal.THB||0)*(marketRates.THB||0) + (bal.CNY||0)*(marketRates.CNY||0);
+            const currentTotalCash = getCurrentVal(currentBal);
+
+            let buyStats = { USD: { lakBought: 0, lakSpent: 0, thbBought: 0, thbSpent: 0 }, USDT: { lakBought: 0, lakSpent: 0, thbBought: 0, thbSpent: 0 }, THB: { lakBought: 0, lakSpent: 0 }, CNY: { lakBought: 0, lakSpent: 0, thbBought: 0, thbSpent: 0 } };
+
+            let realizedLAK = 0; let realizedTHB = 0;
+            let chartDataMap = new Map();
+            let fifoQueues = { USD: { lakBuy: [], lakSell: [], thbBuy: [], thbSell: [] }, USDT: { lakBuy: [], lakSell: [], thbBuy: [], thbSell: [] }, THB: { lakBuy: [], lakSell: [] }, CNY: { lakBuy: [], lakSell: [], thbBuy: [], thbSell: [] } };
+
+            periodTx.forEach(tx => {
+                const date = new Date(tx.date);
+                let key = ''; let label = '';
+                if (chartFilter === '1D') { key = date.getHours().toString(); label = `${date.getHours()}:00`; }
+                else if (chartFilter === '1W' || chartFilter === '1M') { key = date.toDateString(); label = `${date.getDate()}/${date.getMonth()+1}`; }
+                else { key = `${date.getFullYear()}-${date.getMonth()}`; label = `${date.getMonth()+1}/${date.getFullYear().toString().slice(-2)}`; }
+
+                if (!chartDataMap.has(key)) chartDataMap.set(key, { label, wp: 0, cg: 0, timestamp: date.getTime() });
+                let bucket = chartDataMap.get(key);
+
+                const getTxVal = (amt, cur) => amt * (cur === 'LAK' ? 1 : (marketRates[cur] || 0));
+                bucket.cg += getTxVal(tx.receiveAmt, tx.receiveCur) - getTxVal(tx.sendAmt, tx.sendCur);
+
+                if (tx.isTransfer) {
+                    if (tx.receiveCur !== 'SYS') {
+                        if (tx.receiveCur === 'THB') realizedTHB += tx.receiveAmt;
+                        else realizedLAK += tx.receiveAmt * (tx.receiveCur === 'LAK' ? 1 : (marketRates[tx.receiveCur] || 0));
+                    }
+                    if (tx.sendCur !== 'SYS') {
+                        if (tx.sendCur === 'THB') realizedTHB -= tx.sendAmt;
+                        else realizedLAK -= tx.sendAmt * (tx.sendCur === 'LAK' ? 1 : (marketRates[tx.sendCur] || 0));
+                    }
+                }
+                else if (!tx.isAdjustment) {
+                    let txWPLAK = 0; let txWPTHB = 0;
+
+                    if (tx.sendCur === 'LAK' && tx.receiveCur !== 'LAK') {
+                      let cur = tx.receiveCur; if(!buyStats[cur]) buyStats[cur] = {lakBought: 0, lakSpent: 0, thbBought: 0, thbSpent: 0};
+                      buyStats[cur].lakBought += tx.receiveAmt; buyStats[cur].lakSpent += tx.sendAmt;
+                    }
+                    if (tx.sendCur === 'THB' && !['LAK', 'THB'].includes(tx.receiveCur)) {
+                      let cur = tx.receiveCur; if(!buyStats[cur]) buyStats[cur] = {lakBought: 0, lakSpent: 0, thbBought: 0, thbSpent: 0};
+                      buyStats[cur].thbBought += tx.receiveAmt; buyStats[cur].thbSpent += tx.sendAmt;
+                    }
+
+                    ['USD', 'USDT', 'THB', 'CNY'].forEach(cur => {
+                      if (tx.sendCur === 'LAK' && tx.receiveCur === cur) {
+                        let rate = tx.sendAmt / tx.receiveAmt; let remaining = tx.receiveAmt;
+                        while (remaining > 0 && fifoQueues[cur].lakSell.length > 0) {
+                            let sell = fifoQueues[cur].lakSell[0]; let matchAmt = Math.min(remaining, sell.amt);
+                            let profit = matchAmt * (sell.rate - rate);
+                            txWPLAK += profit; realizedLAK += profit;
+                            sell.amt -= matchAmt; remaining -= matchAmt;
+                            if (sell.amt === 0) fifoQueues[cur].lakSell.shift();
+                        }
+                        if (remaining > 0) fifoQueues[cur].lakBuy.push({ amt: remaining, rate: rate });
+                      }
+                      else if (tx.receiveCur === 'LAK' && tx.sendCur === cur) {
+                        let rate = tx.receiveAmt / tx.sendAmt; let remaining = tx.sendAmt;
+                        while (remaining > 0 && fifoQueues[cur].lakBuy.length > 0) {
+                            let buy = fifoQueues[cur].lakBuy[0]; let matchAmt = Math.min(remaining, buy.amt);
+                            let profit = matchAmt * (rate - buy.rate);
+                            txWPLAK += profit; realizedLAK += profit;
+                            buy.amt -= matchAmt; remaining -= matchAmt;
+                            if (buy.amt === 0) fifoQueues[cur].lakBuy.shift();
+                        }
+                        if (remaining > 0) fifoQueues[cur].lakSell.push({ amt: remaining, rate: rate });
+                      }
+
+                      if (cur !== 'THB') {
+                        if (tx.sendCur === 'THB' && tx.receiveCur === cur) {
+                          let rate = tx.sendAmt / tx.receiveAmt; let remaining = tx.receiveAmt;
+                          while (remaining > 0 && fifoQueues[cur].thbSell.length > 0) {
+                              let sell = fifoQueues[cur].thbSell[0]; let matchAmt = Math.min(remaining, sell.amt);
+                              let profit = matchAmt * (sell.rate - rate);
+                              txWPTHB += profit; realizedTHB += profit;
+                              sell.amt -= matchAmt; remaining -= matchAmt;
+                              if (sell.amt === 0) fifoQueues[cur].thbSell.shift();
+                          }
+                          if (remaining > 0) fifoQueues[cur].thbBuy.push({ amt: remaining, rate: rate });
+                        }
+                        else if (tx.receiveCur === 'THB' && tx.sendCur === cur) {
+                          let rate = tx.receiveAmt / tx.sendAmt; let remaining = tx.sendAmt;
+                          while (remaining > 0 && fifoQueues[cur].thbBuy.length > 0) {
+                              let buy = fifoQueues[cur].thbBuy[0]; let matchAmt = Math.min(remaining, buy.amt);
+                              let profit = matchAmt * (rate - buy.rate);
+                              txWPTHB += profit; realizedTHB += profit;
+                              buy.amt -= matchAmt; remaining -= matchAmt;
+                              if (buy.amt === 0) fifoQueues[cur].thbBuy.shift();
+                          }
+                          if (remaining > 0) fifoQueues[cur].thbSell.push({ amt: remaining, rate: rate });
+                        }
+                      }
+                    });
+                    bucket.wp += txWPLAK + (txWPTHB * (marketRates.THB || 0));
+                }
+            });
+
+            let totalWorkingProfit = realizedLAK + (realizedTHB * (marketRates.THB || 0));
+            let chartData = Array.from(chartDataMap.values()).sort((a,b) => a.timestamp - b.timestamp);
+
+            return { totalWorkingProfit, cashGrowth: currentTotalCash - startTotalCash, chartData, balances: currentBal, buyStats, periodTxCount: periodTx.length, periodTxList: periodTx.reverse() };
+          }, [transactions, marketRates, openingBalances, chartFilter, rateHistory]);
+
+          const getSuggestedRate = (base, quote) => {
+            const getLAKRates = (cur) => {
+              let liveRate = marketRates[cur] || 0; let avgCost = 0;
+              if (dashboardStats.buyStats[cur] && dashboardStats.buyStats[cur].lakBought > 0) { avgCost = dashboardStats.buyStats[cur].lakSpent / dashboardStats.buyStats[cur].lakBought; }
+              let sellRate = liveRate * (1 + profitMargin); let buyRate = liveRate * (1 - profitMargin);
+              return { buy: buyRate, sell: sellRate };
+            };
+            if (quote === 'LAK') return getLAKRates(base);
+            if (base === 'USD' && quote === 'THB') {
+              const usdRates = getLAKRates('USD'); const thbRates = getLAKRates('THB');
+              if (usdRates.buy === 0 || thbRates.buy === 0) return { buy: 0, sell: 0 };
+              return { buy: usdRates.buy / thbRates.sell, sell: usdRates.sell / thbRates.buy };
+            }
+            return { buy: 0, sell: 0 };
+          };
+
+          const handleBackspacePointerDown = () => {
+            isLongPressRef.current = false;
+            holdTimerRef.current = setTimeout(() => {
+              triggerHaptic(); setTimeout(triggerHaptic, 100);
+              setTokens(['0']); setJustEvaluated(false); setUsedPercentage(false); setIsFeePatternDetected(false); setCursorIndex(null);
+              isLongPressRef.current = true;
+            }, 500);
+          };
+
+          const handleClearPointerDown = () => {
+            isLongPressRef.current = false;
+            holdTimerRef.current = setTimeout(() => {
+              triggerHaptic(); setTimeout(triggerHaptic, 100);
+              setTokens(['0']); setJustEvaluated(false); setHistory([]); setUsedPercentage(false); setIsFeePatternDetected(false); setCursorIndex(null);
+              isLongPressRef.current = true;
+            }, 500);
+          };
+
+          const clearHoldTimer = () => { if (holdTimerRef.current) { clearTimeout(holdTimerRef.current); holdTimerRef.current = null; } };
+          const onBackspaceClick = () => { if (isLongPressRef.current) return; handleBackspace(); };
+          const onClearClick = () => { if (isLongPressRef.current) return; handleClear(); };
+
+          useEffect(() => {
+            if (activeTab !== 'calc' || showSaveModal || showHistory || showLiquidityModal || isScanning || showMenuModal || showTxLogModal) return;
+            const handleKeyDown = (event) => {
+              const { key } = event;
+              if (/[0-9]/.test(key)) handleDigit(key);
+              if (key === '.' || key === ',') handleDecimal();
+              if (key === '=' || key === 'Enter') { event.preventDefault(); handleEqual(); }
+              if (key === 'Escape') handleClear();
+              if (key === 'Backspace') handleBackspace();
+              if (key === '+' || key === '-') handleOperator(key);
+              if (key === '*') handleOperator('×');
+              if (key === '/') { event.preventDefault(); handleOperator('÷'); }
+              if (key === '%') handlePercentage();
+            };
+            window.addEventListener('keydown', handleKeyDown);
+            return () => window.removeEventListener('keydown', handleKeyDown);
+          });
+
+          const Button = ({ children, className, onClick, onPointerDown, onPointerUp, onPointerLeave, onContextMenu, isActive }) => {
+            return (
+              <button
+                onClick={onClick} onPointerDown={onPointerDown} onPointerUp={onPointerUp} onPointerLeave={onPointerLeave} onContextMenu={onContextMenu}
+                className={`flex items-center justify-center text-[24px] sm:text-[26px] rounded-[24px] active:scale-[0.88] active:brightness-75 active:shadow-[inset_0_6px_15px_rgba(0,0,0,0.3)] dark:active:shadow-[inset_0_6px_15px_rgba(0,0,0,0.7)] transition-all duration-75 select-none h-[68px] sm:h-[74px] font-medium shadow-sm ${className} ${isActive ? 'bg-white dark:bg-white text-blue-600 dark:text-[#3B82F6] shadow-none' : ''}`}
+                style={{ WebkitTapHighlightColor: 'transparent', WebkitTouchCallout: 'none' }}>
+                {children}
+              </button>
+            );
+          };
+
+          return (
+            <div className={`min-h-screen bg-gray-100 dark:bg-[#050505] flex items-center justify-center selection:bg-[#3B82F6]/30 transition-colors duration-300 ${lang === 'LA' ? 'font-lao' : 'font-sans'}`}>
+              <div className="w-full h-[100dvh] sm:h-[800px] max-w-[400px] relative overflow-hidden sm:rounded-[40px] border-gray-200 dark:border-[#ffffff10] sm:border shadow-2xl flex flex-col bg-white dark:bg-[#0B0D14] transition-colors duration-300">
+
+                {/* --- OFFLINE INDICATOR --- */}
+                {isOffline && (
+                  <div className="absolute top-4 sm:top-6 left-1/2 -translate-x-1/2 bg-red-500/90 dark:bg-red-500/80 backdrop-blur-md text-white text-[10px] font-bold px-3 py-1.5 rounded-full z-50 flex items-center gap-1.5 shadow-sm shadow-red-500/20 pointer-events-none">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="1" y1="1" x2="23" y2="23"></line><path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path><path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path><path d="M10.71 5.05A16 16 0 0 1 22.58 9"></path><path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path><path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path><line x1="12" y1="20" x2="12.01" y2="20"></line></svg>
+                    Offline (Local Mode)
+                  </div>
+                )}
+
+                {/* --- CALCULATOR VIEW --- */}
+                <div className={`flex flex-col flex-1 pb-20 ${activeTab === 'calc' ? 'flex' : 'hidden'}`}>
+                  <div className="p-4 flex flex-col gap-3 h-full">
+                    <div className="flex justify-end items-center px-2 pt-4 relative z-20 shrink-0 w-full">
+                      <div className="flex items-center gap-2">
+                        <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageUpload} className="hidden" />
+                        <button onClick={() => fileInputRef.current?.click()} disabled={isScanning} className="text-gray-600 bg-gray-100 border border-gray-200 dark:text-[#8F9BB3] dark:bg-[#1A202C] px-3 py-2 rounded-xl flex items-center gap-1.5 text-xs sm:text-sm font-bold active:scale-95 transition-all disabled:opacity-50 dark:border-[#ffffff0a] shadow-sm">
+                          {isScanning ? <span className="animate-pulse">{t('scanning')}</span> : <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> <span className="hidden sm:inline">{t('scanChat')}</span><span className="sm:hidden">Scan</span></>}
+                        </button>
+
+                        <button onClick={copyMainDisplayAndSave} className="text-gray-600 bg-gray-100 border border-gray-200 dark:text-[#8F9BB3] dark:bg-[#1A202C] px-3 py-2 rounded-xl flex items-center gap-1.5 text-xs sm:text-sm font-bold active:scale-95 transition-all dark:border-[#ffffff0a] shadow-sm">
+                          {mainCopied ? <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"></polyline></svg><span className="text-green-600 dark:text-[#10B981]">{t('copied')}</span></> : <><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg><span className="hidden sm:inline">{t('copySave')}</span><span className="sm:hidden">Save</span></>}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex-1 w-full flex flex-col overflow-hidden relative min-h-0 h-0 mb-4 px-3">
+                      <div className="flex-1 overflow-y-auto flex flex-col justify-end space-y-[6px] mb-2 z-10 min-h-0 h-0" style={{ maskImage: 'linear-gradient(to bottom, transparent 0%, black 20%, black 100%)', WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 20%, black 100%)' }}>
+                        {history.slice(0, 8).reverse().map((item, i) => (
+                          <div key={i} className="text-gray-500 dark:text-[#8F9BB3] text-[20px] sm:text-[22px] font-medium tracking-wide text-right w-full break-all px-2 transition-colors">
+                            {item.fullEquation}
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="shrink-0 flex flex-col items-end z-20 px-2 w-full max-h-[140px] overflow-y-auto overscroll-contain">
+                        <span className="text-gray-500 dark:text-[#64748B] text-2xl font-medium h-8 mb-1 shrink-0 transition-all duration-200 block" style={{ opacity: (!justEvaluated && tokens.length >= 3) ? 1 : 0 }}>
+                          {(!justEvaluated && tokens.length >= 3) ? formatDisplay(runningTotal) : ''}
+                        </span>
+                        <div className="text-gray-900 dark:text-white font-semibold tracking-tight w-full flex flex-wrap justify-end leading-[1.1] transition-colors" style={{
+                          fontSize: getDisplayText().length > 22 ? '24px' : getDisplayText().length > 18 ? '28px' : getDisplayText().length > 14 ? '34px' : getDisplayText().length > 10 ? '44px' : '56px',
+                          transition: 'font-size 0.2s'
+                        }}>
+                          {tokens.map((t, idx) => (
+                            <span
+                              key={idx}
+                              onClick={() => { if (!isOperator(t) && !justEvaluated) setCursorIndex(cursorIndex === idx ? null : idx); }}
+                              className={`inline-block whitespace-nowrap transition-colors duration-200 ${cursorIndex === idx ? 'bg-blue-100 dark:bg-[#3B82F6]/30 text-blue-600 dark:text-[#3B82F6] rounded-xl px-1.5 -mx-1.5 cursor-pointer' : (!isOperator(t) && !justEvaluated ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-[#ffffff0a] rounded-xl px-1.5 -mx-1.5' : '')}`}
+                              style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                            >
+                              {isOperator(t) ? <span className="mx-1.5 text-blue-500 dark:text-[#3B82F6]">{t}</span> : formatDisplay(t)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-4 gap-3 mt-auto w-full max-w-[360px] mx-auto px-1 pb-4 shrink-0">
+                      <Button onClick={onBackspaceClick} onPointerDown={handleBackspacePointerDown} onPointerUp={clearHoldTimer} onPointerLeave={clearHoldTimer} onContextMenu={(e) => e.preventDefault()} className="bg-gray-200 dark:bg-[#1A202C] text-gray-700 dark:text-[#8F9BB3] border border-gray-300 dark:border-[#ffffff05]">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 4H8l-7 8 7 8h13a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2z"></path><line x1="18" y1="9" x2="12" y2="15"></line><line x1="12" y1="9" x2="18" y2="15"></line></svg>
+                      </Button>
+                      <Button onClick={handleToggleSign} className="bg-gray-200 dark:bg-[#1A202C] text-gray-700 dark:text-[#8F9BB3] border border-gray-300 dark:border-[#ffffff05]">+/-</Button>
+                      <Button onClick={handlePercentage} className="bg-gray-200 dark:bg-[#1A202C] text-gray-700 dark:text-[#8F9BB3] border border-gray-300 dark:border-[#ffffff05]">%</Button>
+                      <Button onClick={() => handleOperator('÷')} className="bg-blue-600 dark:bg-[#3B82F6] text-white shadow-md shadow-blue-500/30 dark:shadow-[0_4px_15px_rgba(59,130,246,0.3)] font-semibold" isActive={isOperator(tokens[tokens.length - 1]) && tokens[tokens.length - 1] === '÷'}>÷</Button>
+
+                      <Button onClick={() => handleDigit('7')} className="bg-gray-50 dark:bg-[#131722] text-gray-900 dark:text-white border border-gray-100 dark:border-[#ffffff03]">7</Button>
+                      <Button onClick={() => handleDigit('8')} className="bg-gray-50 dark:bg-[#131722] text-gray-900 dark:text-white border border-gray-100 dark:border-[#ffffff03]">8</Button>
+                      <Button onClick={() => handleDigit('9')} className="bg-gray-50 dark:bg-[#131722] text-gray-900 dark:text-white border border-gray-100 dark:border-[#ffffff03]">9</Button>
+                      <Button onClick={() => handleOperator('×')} className="bg-blue-600 dark:bg-[#3B82F6] text-white shadow-md shadow-blue-500/30 dark:shadow-[0_4px_15px_rgba(59,130,246,0.3)] font-semibold" isActive={isOperator(tokens[tokens.length - 1]) && tokens[tokens.length - 1] === '×'}>×</Button>
+
+                      <Button onClick={() => handleDigit('4')} className="bg-gray-50 dark:bg-[#131722] text-gray-900 dark:text-white border border-gray-100 dark:border-[#ffffff03]">4</Button>
+                      <Button onClick={() => handleDigit('5')} className="bg-gray-50 dark:bg-[#131722] text-gray-900 dark:text-white border border-gray-100 dark:border-[#ffffff03]">5</Button>
+                      <Button onClick={() => handleDigit('6')} className="bg-gray-50 dark:bg-[#131722] text-gray-900 dark:text-white border border-gray-100 dark:border-[#ffffff03]">6</Button>
+                      <Button onClick={() => handleOperator('-')} className="bg-blue-600 dark:bg-[#3B82F6] text-white shadow-md shadow-blue-500/30 dark:shadow-[0_4px_15px_rgba(59,130,246,0.3)] font-semibold" isActive={isOperator(tokens[tokens.length - 1]) && tokens[tokens.length - 1] === '-'}>-</Button>
+
+                      <Button onClick={() => handleDigit('1')} className="bg-gray-50 dark:bg-[#131722] text-gray-900 dark:text-white border border-gray-100 dark:border-[#ffffff03]">1</Button>
+                      <Button onClick={() => handleDigit('2')} className="bg-gray-50 dark:bg-[#131722] text-gray-900 dark:text-white border border-gray-100 dark:border-[#ffffff03]">2</Button>
+                      <Button onClick={() => handleDigit('3')} className="bg-gray-50 dark:bg-[#131722] text-gray-900 dark:text-white border border-gray-100 dark:border-[#ffffff03]">3</Button>
+                      <Button onClick={() => handleOperator('+')} className="bg-blue-600 dark:bg-[#3B82F6] text-white shadow-md shadow-blue-500/30 dark:shadow-[0_4px_15px_rgba(59,130,246,0.3)] font-semibold" isActive={isOperator(tokens[tokens.length - 1]) && tokens[tokens.length - 1] === '+'}>+</Button>
+
+                      <Button onClick={onClearClick} onPointerDown={handleClearPointerDown} onPointerUp={clearHoldTimer} onPointerLeave={clearHoldTimer} onContextMenu={(e) => e.preventDefault()} className="bg-gray-200 dark:bg-[#1A202C] text-red-600 dark:text-[#EF4444] border border-gray-300 dark:border-[#ffffff05] font-bold">
+                        {tokens.length === 1 && tokens[0] === '0' ? 'AC' : 'C'}
+                      </Button>
+
+                      <Button onClick={() => handleDigit('0')} className="bg-gray-50 dark:bg-[#131722] text-gray-900 dark:text-white border border-gray-100 dark:border-[#ffffff03]">0</Button>
+                      <Button onClick={handleDecimal} className="bg-gray-50 dark:bg-[#131722] text-gray-900 dark:text-white border border-gray-100 dark:border-[#ffffff03]">.</Button>
+                      <Button onClick={handleEqual} className="bg-blue-600 dark:bg-[#3B82F6] text-white shadow-md shadow-blue-500/30 dark:shadow-[0_4px_15px_rgba(59,130,246,0.3)] font-semibold">=</Button>
+                    </div>
+                  </div>
+                </div>
+                {/* --- DASHBOARD VIEW --- */}
+                <div className={`flex flex-col flex-1 pb-24 overflow-y-auto bg-white dark:bg-[#0B0D14] transition-colors duration-300 ${activeTab === 'dash' ? 'flex' : 'hidden'}`}>
+                  <div className="p-5 pt-10 flex flex-col gap-6">
+                    <div className="flex justify-between items-center">
+                      <div className="flex items-center gap-3">
+                        <button onClick={() => setShowMenuModal(true)} className="text-gray-500 hover:text-gray-900 dark:text-[#8F9BB3] dark:hover:text-white transition-colors active:scale-90 bg-gray-100 dark:bg-[#1A202C] p-2.5 rounded-xl border border-gray-200 dark:border-[#ffffff05]">
+                          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="12" x2="21" y2="12"></line><line x1="3" y1="6" x2="21" y2="6"></line><line x1="3" y1="18" x2="21" y2="18"></line></svg>
+                        </button>
+                        <div className="flex flex-col leading-tight ml-1">
+                          <span className="text-gray-500 dark:text-[#8F9BB3] text-[10px] font-bold uppercase tracking-widest mb-0.5">{t('tracker')}</span>
+                          <span className="text-gray-900 dark:text-white text-lg font-bold truncate max-w-[140px] tracking-tight">
+                            Hi, {user?.displayName ? user.displayName.split(' ')[0] : (user?.email ? user.email.split('@')[0] : 'User')}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {(() => {
+                      const cData = dashboardStats.chartData;
+                      const maxVal = Math.max(0, ...cData.map(d => Math.max(d.wp, d.cg)));
+                      const minVal = Math.min(0, ...cData.map(d => Math.min(d.wp, d.cg)));
+                      const paddedMax = maxVal + (maxVal - minVal) * 0.15 || 1000;
+                      const paddedMin = minVal - (maxVal - minVal) * 0.15 || -1000;
+                      const range = paddedMax - paddedMin || 2000;
+
+                      const plotBottom = 85; const plotTop = 5; const plotHeight = plotBottom - plotTop;
+                      const scaleY = (val) => plotBottom - (((val - paddedMin) / range) * plotHeight);
+                      const zeroY = scaleY(0);
+
+                      const filters = ['1D', '1W', '1M'];
+                      const isPositiveWP = dashboardStats.totalWorkingProfit >= 0;
+                      const isPositiveCG = dashboardStats.cashGrowth >= 0;
+
+                      return (
+                        <div className="bg-gradient-to-br from-blue-50/80 via-white to-white dark:from-[#171e30] dark:via-[#131722] dark:to-[#131722] p-5 sm:p-6 rounded-[28px] border border-blue-200 dark:border-[#2a3655] relative overflow-hidden shadow-[0_12px_40px_rgba(59,130,246,0.15)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.6)]">
+                          <div className={`absolute top-[-25%] right-[-15%] w-[70%] h-[70%] rounded-full blur-[80px] pointer-events-none opacity-50 dark:opacity-25 transition-colors duration-1000 ${isPositiveWP ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                          <div className="relative z-10">
+                            <div className="flex justify-between items-center mb-1">
+                              <div className="text-gray-500 dark:text-[#8F9BB3] text-xs font-semibold uppercase tracking-wider">{t('workingProfit')}</div>
+                              <div className="flex items-center gap-3 text-[9px] font-bold text-gray-400 dark:text-[#64748B] uppercase tracking-wider">
+                                <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-[3px] bg-green-500 dark:bg-[#10B981]"></div> WP</span>
+                                <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-[3px] bg-blue-500 dark:bg-[#3B82F6]"></div> PnL</span>
+                              </div>
+                            </div>
+                            <div className="flex justify-between items-end mb-1">
+                              <div className={`text-[28px] sm:text-3xl font-bold tracking-tight ${isPositiveWP ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>
+                                {isPositiveWP && dashboardStats.totalWorkingProfit > 0 ? '+' : ''}{formatDisplay(dashboardStats.totalWorkingProfit, true)} <span className="text-base sm:text-lg font-medium opacity-50">LAK</span>
+                              </div>
+                              <span className="text-[10px] font-bold bg-white/60 dark:bg-[#ffffff0a] backdrop-blur-md border border-gray-200/50 dark:border-[#ffffff10] px-2.5 py-1 rounded-lg text-gray-500 dark:text-[#8F9BB3] mb-1.5 shadow-sm">
+                                {dashboardStats.periodTxCount} {t('txns')}
+                              </span>
+                            </div>
+                            <div className={`text-xs sm:text-sm font-bold mb-6 flex items-center gap-1 ${isPositiveCG ? 'text-blue-600 dark:text-[#3B82F6]' : 'text-orange-500 dark:text-[#F59E0B]'}`}>
+                              {isPositiveCG ? '▲' : '▼'} {formatDisplay(Math.abs(dashboardStats.cashGrowth), true)} LAK {t('unrealizedPnL')}
+                            </div>
+
+                            <div className="w-full h-[120px] mb-6 relative">
+                              <svg className="w-full h-full overflow-visible">
+                                <line x1="0%" y1={`${zeroY}%`} x2="100%" y2={`${zeroY}%`} stroke="#4B5563" strokeWidth="1" strokeDasharray="4" opacity="0.4" />
+                                {cData.map((d, i) => {
+                                  const xCenter = (i + 0.5) * (100 / (cData.length || 1));
+                                  const barWidth = Math.min(100 / (cData.length || 1) * 0.35, 6);
+                                  const wpY = scaleY(d.wp); const wpHeight = Math.abs(wpY - zeroY); const wpYStart = d.wp >= 0 ? wpY : zeroY;
+                                  const cgY = scaleY(d.cg); const cgHeight = Math.abs(cgY - zeroY); const cgYStart = d.cg >= 0 ? cgY : zeroY;
+                                  const showLabel = cData.length <= 8 || i % Math.ceil(cData.length / 6) === 0;
+
+                                  return (
+                                    <g key={i}>
+                                      <rect x={`${xCenter - barWidth - 0.5}%`} y={`${wpYStart}%`} width={`${barWidth}%`} height={`${Math.max(wpHeight, 0.5)}%`} fill={d.wp >= 0 ? '#10B981' : '#EF4444'} rx="1.5" />
+                                      <rect x={`${xCenter + 0.5}%`} y={`${cgYStart}%`} width={`${barWidth}%`} height={`${Math.max(cgHeight, 0.5)}%`} fill={d.cg >= 0 ? '#3B82F6' : '#F59E0B'} rx="1.5" />
+                                      {showLabel && <text x={`${xCenter}%`} y="100%" fontSize="10px" fill="#8F9BB3" textAnchor="middle" style={{fontFamily: 'inherit'}}>{d.label}</text>}
+                                    </g>
+                                  );
+                                })}
+                                {cData.length === 0 && <text x="50%" y="50%" fontSize="12px" fill="#8F9BB3" textAnchor="middle" style={{fontFamily: 'inherit'}}>No activity</text>}
+                              </svg>
+                            </div>
+                            <div className="flex bg-white/50 dark:bg-[#0B0D14]/50 backdrop-blur-md p-1 rounded-xl justify-between border border-blue-100/50 dark:border-[#ffffff05]">
+                              {filters.map(f => (
+                                <button key={f} onClick={() => setChartFilter(f)} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${chartFilter === f ? 'bg-white dark:bg-[#1A202C] text-blue-600 dark:text-[#3B82F6] shadow-sm border border-gray-200 dark:border-[#ffffff0a]' : 'text-gray-500 dark:text-[#8F9BB3] hover:text-gray-800 dark:hover:text-gray-200'}`}>{f}</button>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Liquidity Pools */}
+                    <div>
+                      <h3 className="text-gray-900 dark:text-white text-sm font-bold mb-3 flex justify-between items-center tracking-wide">
+                        {t('liquidityPools')}
+                        <div className="flex gap-2">
+                          <button onClick={() => setIsReorderingPools(!isReorderingPools)} className={`p-1.5 rounded-lg active:scale-95 transition-all flex items-center justify-center ${isReorderingPools ? 'bg-blue-600 text-white dark:bg-[#3B82F6]' : 'text-gray-400 bg-gray-50 dark:bg-[#1A202C] dark:text-[#64748B] border border-gray-100 dark:border-[#ffffff0a]'}`}>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 9l4-4 4 4M16 15l-4 4-4-4"/></svg>
+                          </button>
+                          <button onClick={handleOpenLiquidityConfig} className="text-blue-600 bg-blue-50 dark:text-[#3B82F6] flex items-center gap-1.5 dark:bg-[#3B82F6]/10 px-3 py-1.5 rounded-lg active:scale-95 transition-all">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                            <span className="text-[10px] font-bold uppercase tracking-wider">{t('configure')}</span>
+                          </button>
+                        </div>
+                      </h3>
+                      <div className="grid grid-cols-2 gap-3">
+                        {poolOrder.map((cur, idx) => {
+                          const bal = dashboardStats.balances[cur] || 0;
+                          const isLow = bal < liquidityThresholds[cur];
+                          return (
+                            <div key={cur} className={`relative overflow-hidden bg-gray-50 dark:bg-[#131722] p-4 rounded-2xl border ${isLow ? 'border-red-400 dark:border-[#EF4444]/50 shadow-[0_0_15px_rgba(239,68,68,0.1)] dark:shadow-[0_0_15px_rgba(239,68,68,0.15)]' : 'border-gray-100 dark:border-[#ffffff05]'}`}>
+                              <div className={`transition-opacity duration-200 ${isReorderingPools ? 'opacity-40' : 'opacity-100'}`}>
+                                <div className="flex justify-between items-center mb-2">
+                                  <span className="text-gray-500 dark:text-[#8F9BB3] text-xs font-bold tracking-wider">{cur}</span>
+                                  {isLow && <span className="w-2 h-2 rounded-full bg-red-500 dark:bg-[#EF4444] animate-pulse"></span>}
+                                </div>
+                                <div className={`text-xl font-bold tracking-tight truncate ${isLow ? 'text-red-600 dark:text-[#EF4444]' : 'text-gray-900 dark:text-white'}`}>{formatDisplay(bal, true)}</div>
+                              </div>
+                              {isReorderingPools && (
+                                <div className="absolute inset-0 flex items-center justify-center gap-3 bg-transparent z-10">
+                                  <button onClick={() => movePool(idx, -1)} disabled={idx === 0} className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-[#1A202C] shadow-md border border-gray-200 dark:border-[#ffffff10] text-gray-700 dark:text-gray-200 disabled:opacity-30 active:scale-90 transition-all"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                                  <button onClick={() => movePool(idx, 1)} disabled={idx === poolOrder.length - 1} className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-[#1A202C] shadow-md border border-gray-200 dark:border-[#ffffff10] text-gray-700 dark:text-gray-200 disabled:opacity-30 active:scale-90 transition-all"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Dynamic Market Quotes */}
+                    <div>
+                      <div className="flex justify-between items-center mb-3">
+                        <div className="flex items-center gap-2">
+                          <h3 className="text-gray-900 dark:text-white text-sm font-bold tracking-wide">{t('suggestedRates')}</h3>
+                          <button onClick={() => setIsReorderingRates(!isReorderingRates)} className={`p-1 rounded-lg active:scale-95 transition-all flex items-center justify-center ${isReorderingRates ? 'bg-blue-600 text-white dark:bg-[#3B82F6]' : 'text-gray-400 bg-gray-50 dark:bg-[#1A202C] border border-gray-100 dark:border-[#ffffff0a] dark:text-[#64748B]'}`}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M8 9l4-4 4 4M16 15l-4 4-4-4"/></svg>
+                          </button>
+                        </div>
+                        <span className="text-[10px] bg-gray-100 dark:bg-[#1A202C] border border-gray-200 dark:border-[#ffffff0a] text-blue-600 dark:text-[#3B82F6] px-2 py-1 rounded-lg font-bold">{(profitMargin*100).toFixed(2)}% {t('margin')}</span>
+                      </div>
+                      <div className="bg-gray-50 dark:bg-[#131722] rounded-2xl border border-gray-100 dark:border-[#ffffff05] overflow-hidden">
+                        <div className="flex text-gray-500 dark:text-[#8F9BB3] text-[10px] uppercase font-bold tracking-wider border-b border-gray-200 dark:border-[#ffffff05] bg-gray-100 dark:bg-[#1A202C]">
+                          <div className={`flex-1 p-3 transition-all ${isReorderingRates ? 'pl-16' : 'pl-5'}`}>{t('pair')}</div><div className="flex-1 p-3 text-right">{t('weBuy')}</div><div className="flex-1 p-3 text-right pr-5">{t('weSell')}</div>
+                        </div>
+                        {rateOrder.map((pair, idx, arr) => {
+                          const rates = getSuggestedRate(pair.base, pair.quote);
+                          const formatRate = (val, decimals) => {
+                            if (!val) return "0";
+                            let fixedStr = val.toFixed(decimals); let [intPart, decPart] = fixedStr.split('.');
+                            intPart = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+                            return decPart ? `${intPart}.${decPart}` : intPart;
+                          };
+                          return (
+                            <div key={`${pair.base}/${pair.quote}`} className={`flex text-sm border-b border-gray-100 dark:border-[#ffffff05] hover:bg-gray-100 dark:hover:bg-[#1A202C] transition-colors relative ${idx === arr.length - 1 ? 'border-0' : ''}`}>
+                              {isReorderingRates && (
+                                <div className="absolute left-0 top-0 bottom-0 flex items-center justify-center gap-1 pl-2 w-14 bg-gray-100/50 dark:bg-[#1A202C]/50 border-r border-gray-200 dark:border-[#ffffff05]">
+                                  <button onClick={() => moveRate(idx, -1)} disabled={idx === 0} className="p-1 text-gray-500 hover:text-gray-900 dark:text-[#8F9BB3] dark:hover:text-white disabled:opacity-20 active:scale-90"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                                  <button onClick={() => moveRate(idx, 1)} disabled={idx === arr.length - 1} className="p-1 text-gray-500 hover:text-gray-900 dark:text-[#8F9BB3] dark:hover:text-white disabled:opacity-20 active:scale-90"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                                </div>
+                              )}
+                              <div className={`flex-1 p-3 text-gray-900 dark:text-gray-200 font-semibold transition-all ${isReorderingRates ? 'pl-16' : 'pl-5'}`}>{pair.base}<span className="text-gray-400 dark:text-[#64748B]">/{pair.quote}</span></div>
+                              <div className="flex-1 p-3 text-right text-green-600 dark:text-[#10B981] font-bold">{formatRate(rates.buy, pair.dec)}</div>
+                              <div className="flex-1 p-3 text-right pr-5 text-red-600 dark:text-[#EF4444] font-bold">{formatRate(rates.sell, pair.dec)}</div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Compact Recent Transactions */}
+                    <div>
+                      <h3 className="text-gray-900 dark:text-white text-sm font-bold mb-3 flex justify-between items-center tracking-wide">
+                        {t('recentList')}
+                        <button onClick={() => setShowTxLogModal(true)} className="text-blue-600 dark:text-[#3B82F6] text-[10px] uppercase font-bold bg-blue-50 dark:bg-[#3B82F6]/10 px-3 py-1.5 rounded-lg active:scale-95 transition-transform">{t('viewAll')}</button>
+                      </h3>
+                      <div className="max-h-[350px] overflow-y-auto">
+                        <div className="bg-white dark:bg-[#131722] rounded-2xl border border-gray-100 dark:border-[#ffffff05] flex flex-col overflow-hidden shadow-sm">
+                          {dashboardStats.periodTxList.length === 0 && <div className="text-center p-6 text-gray-400 dark:text-[#64748B] text-sm font-medium">No transactions found</div>}
+                          {dashboardStats.periodTxList.slice(0, 100).map((tx, idx, arr) => (
+                            <div key={tx.id} className={`shrink-0 py-2.5 px-3 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-[#161b27] transition-colors relative group ${idx !== arr.length - 1 ? 'border-b border-gray-100 dark:border-[#ffffff0a]' : ''}`}>
+                              <div className="flex flex-col gap-1 w-[35%]">
+                                <span className="text-[9px] text-gray-400 dark:text-[#64748B] font-semibold tracking-wider">
+                                  {new Date(tx.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})} • #{String(tx.id).slice(-4)}
+                                </span>
+                                <div className="flex items-center">
+                                  {tx.isAdjustment ? (
+                                    <span className="text-[10px] font-bold text-purple-600 dark:text-[#A855F7] bg-purple-50 dark:bg-[#A855F7]/10 px-1.5 py-0.5 rounded border border-purple-100 dark:border-[#A855F7]/20">Capital Adj.</span>
+                                  ) : tx.isTransfer ? (
+                                    <span className="text-[10px] font-bold text-orange-600 dark:text-[#F97316] bg-orange-50 dark:bg-[#F97316]/10 px-1.5 py-0.5 rounded border border-orange-100 dark:border-[#F97316]/20">{t('transferMode')}</span>
+                                  ) : (
+                                    <span className="text-[10px] font-bold text-blue-600 dark:text-[#3B82F6] bg-blue-50 dark:bg-[#3B82F6]/10 px-1.5 py-0.5 rounded border border-blue-100 dark:border-[#3B82F6]/20">{tx.receiveCur} → {tx.sendCur}</span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex flex-col items-center justify-center w-[25%] text-center">
+                                {tx.isAdjustment ? (
+                                  <span className="text-[10px] text-purple-400 dark:text-[#A855F7]/60 font-medium">System</span>
+                                ) : tx.isTransfer ? (
+                                  <span className="text-xs font-bold text-gray-400 dark:text-[#64748B]">-</span>
+                                ) : tx.rate > 0 ? (
+                                  <span className="text-xs font-bold text-gray-700 dark:text-[#E2E8F0]">@{formatDisplay(tx.rate)}</span>
+                                ) : (
+                                  <span className="text-[10px] text-gray-400">-</span>
+                                )}
+                              </div>
+
+                              <div className="flex flex-col items-end justify-center w-[40%] pr-7 relative">
+                                {tx.receiveCur !== 'SYS' && (
+                                  <span className="text-xs font-bold text-green-600 dark:text-[#10B981] truncate w-full text-right">
+                                    +{formatDisplay(tx.receiveAmt, true)} <span className="text-[9px]">{tx.receiveCur}</span>
+                                  </span>
+                                )}
+                                {tx.sendCur !== 'SYS' && (
+                                  <span className="text-[10px] font-semibold text-red-500 dark:text-[#EF4444] truncate w-full text-right opacity-90">
+                                    -{formatDisplay(tx.sendAmt, true)} <span className="text-[9px]">{tx.sendCur}</span>
+                                  </span>
+                                )}
+                                <button onClick={() => setTxToDelete(tx.id)} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-300 hover:text-red-500 dark:text-[#4B5563] dark:hover:text-[#EF4444] p-1.5 transition-colors active:scale-90">
+                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+                {/* --- MARKETS VIEW --- */}
+                <div className={`flex flex-col flex-1 pb-24 overflow-y-auto bg-gray-100 dark:bg-[#050505] transition-colors duration-300 ${activeTab === 'market' ? 'flex' : 'hidden'}`}>
+                  <div className="p-5 pt-10 flex flex-col gap-6">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <h2 className="text-gray-900 dark:text-white text-2xl font-bold tracking-tight">{t('markets')}</h2>
+                        <div className="flex items-center gap-1.5 mt-1">
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
+                          <span className="text-gray-500 dark:text-[#8F9BB3] text-[10px] font-bold uppercase tracking-wider">{t('update15s')}</span>
+                        </div>
+                      </div>
+                      <button onClick={handleOpenAlertModal} className="text-blue-600 bg-blue-50 dark:text-[#3B82F6] dark:bg-[#3B82F6]/10 px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold active:scale-95 transition-all shadow-sm">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+                        {t('setAlert')}
+                      </button>
+                    </div>
+
+                    <div className="flex flex-col gap-2.5">
+                      {[
+                        { id: 'DXY', name: 'US Dollar Index', pair: 'DXY', symbol: '$', decimals: 2, tvSymbol: 'TVC:DXY' },
+                        { id: 'USDTHB', name: 'US Dollar / Thai Baht', pair: 'USD/THB', symbol: '฿', decimals: 2, tvSymbol: 'FX_IDC:USDTHB' },
+                        { id: 'CNYTHB', name: 'Chinese Yuan / Thai Baht', pair: 'CNY/THB', symbol: '฿', decimals: 2, tvSymbol: 'FX_IDC:CNYTHB' },
+                        { id: 'USDCNY', name: 'US Dollar / Chinese Yuan', pair: 'USD/CNY', symbol: '¥', decimals: 2, tvSymbol: 'FX_IDC:USDCNY' },
+                        { id: 'USDVND', name: 'US Dollar / Vietnamese Dong', pair: 'USD/VND', symbol: '₫', decimals: 2, tvSymbol: 'FX_IDC:USDVND' }
+                      ].map(asset => {
+                        const price = livePrices[asset.id];
+                        const dir = priceDirections[asset.id];
+                        return (
+                          <div key={asset.id} onClick={() => setSelectedChart(asset)} className="flex items-center justify-between bg-white dark:bg-[#131722] p-4 rounded-[20px] border border-gray-200 dark:border-[#ffffff0a] shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:shadow-none relative overflow-hidden transition-all active:scale-[0.97] cursor-pointer group">
+                            <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none transition-colors duration-500 opacity-40 dark:opacity-20 ${dir === 'up' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                            <div className="flex items-center gap-4 relative z-10">
+                              <div className="w-11 h-11 rounded-full bg-gray-50 dark:bg-[#1A202C] flex items-center justify-center font-bold text-gray-700 dark:text-[#8F9BB3] border border-gray-100 dark:border-[#ffffff05] shadow-sm group-hover:scale-105 transition-transform text-lg">{asset.symbol}</div>
+                              <div className="flex flex-col">
+                                <span className="text-gray-900 dark:text-white font-bold text-base tracking-wide flex items-center gap-1.5">{asset.pair}</span>
+                                <span className="text-gray-500 dark:text-[#8F9BB3] text-[10px] font-bold tracking-wider uppercase">{asset.name}</span>
+                              </div>
+                            </div>
+                            <div className="flex flex-col items-end relative z-10">
+                              <div className={`text-lg font-bold tracking-tight transition-colors duration-300 ${dir === 'up' ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>
+                                {price ? price.toLocaleString('en-US', { minimumFractionDigits: asset.decimals, maximumFractionDigits: asset.decimals }) : "0"}
+                              </div>
+                              <div className={`flex items-center gap-1 text-[10px] font-bold transition-colors ${dir === 'up' ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>
+                                {dir === 'up' ? '▲' : '▼'} {t('live15s')}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {alerts.length > 0 && (
+                      <div className="flex flex-col gap-2.5 mt-2">
+                        <h3 className="text-gray-900 dark:text-white text-sm font-bold tracking-wide">{t('priceAlerts')}</h3>
+                        {alerts.map(alert => (
+                          <div key={alert.id} className="flex justify-between items-center bg-blue-50/50 dark:bg-[#1A202C] p-4 rounded-2xl border border-blue-100 dark:border-[#ffffff0a] shadow-sm">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-2 h-2 rounded-full ${alert.active ? 'bg-blue-500 animate-pulse' : 'bg-gray-400 dark:bg-gray-600'}`}></div>
+                              <div className="flex flex-col">
+                                <span className="text-gray-900 dark:text-white font-bold text-sm">{alert.asset}</span>
+                                <span className="text-gray-500 dark:text-[#8F9BB3] text-[10px] font-bold uppercase tracking-wider">
+                                  {alert.condition === 'above' ? t('above') : t('below')} {formatDisplay(alert.price)} • <span className={alert.active ? "text-blue-500" : "text-gray-500"}>{alert.active ? t('active') : t('triggered')}</span>
+                                </span>
+                              </div>
+                            </div>
+                            <button onClick={() => setAlerts(prev => prev.filter(a => a.id !== alert.id))} className="text-gray-400 hover:text-red-500 dark:text-[#64748B] dark:hover:text-[#EF4444] transition-colors p-2 active:scale-90">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                  </div>
+                </div>
+
+                {/* --- PREMIUM BOTTOM TAB BAR --- */}
+                <div className="absolute bottom-0 w-full bg-white/80 dark:bg-[#0B0D14]/80 backdrop-blur-xl border-t border-gray-200 dark:border-[#ffffff0a] flex justify-around pb-6 pt-3 z-30 shadow-[0_-10px_40px_rgba(0,0,0,0.05)] dark:shadow-[0_-10px_40px_rgba(0,0,0,0.3)] transition-colors">
+                  <button onClick={() => setActiveTab('calc')} className={`flex flex-col items-center gap-1 transition-all duration-200 ${activeTab === 'calc' ? 'text-blue-600 dark:text-[#3B82F6] scale-105' : 'text-gray-400 hover:text-gray-600 dark:text-[#64748B] dark:hover:text-[#8F9BB3]'}`}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="2" width="16" height="20" rx="4" ry="4"></rect><line x1="8" y1="6" x2="16" y2="6"></line><line x1="16" y1="14" x2="16" y2="14.01"></line><line x1="12" y1="14" x2="12" y2="14.01"></line><line x1="8" y1="14" x2="8" y2="14.01"></line><line x1="16" y1="18" x2="16" y2="18.01"></line><line x1="12" y1="18" x2="12" y2="18.01"></line><line x1="8" y1="18" x2="8" y2="18.01"></line></svg>
+                    <span className="text-[10px] font-bold tracking-wide">{t('calc')}</span>
+                  </button>
+                  <button onClick={() => setActiveTab('dash')} className={`flex flex-col items-center gap-1 transition-all duration-200 ${activeTab === 'dash' ? 'text-blue-600 dark:text-[#3B82F6] scale-105' : 'text-gray-400 hover:text-gray-600 dark:text-[#64748B] dark:hover:text-[#8F9BB3]'}`}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v18h18"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg>
+                    <span className="text-[10px] font-bold tracking-wide">{t('tracker')}</span>
+                  </button>
+                  <button onClick={() => setActiveTab('market')} className={`flex flex-col items-center gap-1 transition-all duration-200 ${activeTab === 'market' ? 'text-blue-600 dark:text-[#3B82F6] scale-105' : 'text-gray-400 hover:text-gray-600 dark:text-[#64748B] dark:hover:text-[#8F9BB3]'}`}>
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+                    <span className="text-[10px] font-bold tracking-wide">{t('markets')}</span>
+                  </button>
+                </div>
+                {/* --- SMART SAVE TRANSACTION MODAL --- */}
+                <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end transition-opacity duration-300 ${showSaveModal ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                  <div className={`bg-white dark:bg-[#131722] w-full rounded-t-[32px] p-6 pb-28 border-t border-gray-200 dark:border-[#ffffff10] shadow-[0_-10px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_-10px_50px_rgba(0,0,0,0.5)] transform transition-transform duration-300 ${showSaveModal ? 'translate-y-0' : 'translate-y-full'}`}>
+                    <div className="w-12 h-1.5 bg-gray-200 dark:bg-[#ffffff15] rounded-full mx-auto mb-4"></div>
+
+                    {txSuccess ? (
+                      <div className="flex flex-col items-center justify-center py-10">
+                        <div className="w-20 h-20 bg-green-50 dark:bg-[#10B981]/20 rounded-full flex items-center justify-center mb-4">
+                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </div>
+                        <h3 className="text-gray-900 dark:text-white text-xl font-bold">Transaction Saved!</h3>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex justify-between items-center mb-5">
+                          <h3 className="text-gray-900 dark:text-white text-xl font-bold">{t('smartLog')}</h3>
+                          <button onClick={() => setShowSaveModal(false)} className="text-gray-500 dark:text-[#8F9BB3] bg-gray-100 dark:bg-[#1A202C] rounded-full p-1.5 active:scale-90 transition-transform"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                        </div>
+
+                        {/* MODE SWITCHER */}
+                        <div className="flex bg-gray-100 dark:bg-[#1A202C] p-1.5 rounded-2xl mb-5 border border-gray-200/50 dark:border-[#ffffff0a]">
+                           <button onClick={() => setSaveMode('exchange')} className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all ${saveMode === 'exchange' ? 'bg-white dark:bg-[#0B0D14] text-blue-600 dark:text-[#3B82F6] shadow-sm' : 'text-gray-500 dark:text-[#8F9BB3]'}`}>{t('exchangeMode')}</button>
+                           <button onClick={() => setSaveMode('transfer')} className={`flex-1 py-2 rounded-xl text-sm font-bold transition-all flex justify-center items-center ${saveMode === 'transfer' ? 'bg-white dark:bg-[#0B0D14] text-orange-600 dark:text-[#F97316] shadow-sm' : 'text-gray-500 dark:text-[#8F9BB3]'}`}>
+                              {t('transferMode')} {(usedPercentage || isFeePatternDetected) && <span className="w-2 h-2 rounded-full bg-orange-500 inline-block ml-1.5 animate-pulse"></span>}
+                           </button>
+                        </div>
+
+                        {saveMode === 'exchange' ? (
+                            <>
+                              {quickTx.isManual ? (
+                                <div className="flex flex-col gap-4">
+                                  <div className="bg-gray-50 dark:bg-[#1A202C] p-5 rounded-3xl border border-gray-200 dark:border-[#ffffff0a]">
+                                    <div className="text-gray-500 dark:text-[#8F9BB3] text-xs mb-4 text-center font-medium">{t('noAutoDetect')}</div>
+                                    <div className="flex gap-3 mb-4">
+                                      <div className="flex-1">
+                                        <label className="text-[10px] text-gray-500 dark:text-[#8F9BB3] uppercase font-bold tracking-wider block mb-1.5">{t('fcyAmount')}</label>
+                                        <input
+                                          type="text"
+                                          inputMode="decimal"
+                                          value={formatInputStr(quickTx.unitAmt)}
+                                          onChange={e => {
+                                              const raw = e.target.value.replace(/,/g, '');
+                                              if (raw === '' || /^-?\d*\.?\d*$/.test(raw)) setQuickTx({...quickTx, unitAmt: raw});
+                                          }}
+                                          className="w-full bg-white dark:bg-[#0B0D14] text-gray-900 dark:text-white p-3 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none font-semibold transition-colors focus:border-blue-500 dark:focus:border-[#3B82F6]" placeholder="e.g. 5,000"
+                                        />
+                                      </div>
+                                      <div className="w-24">
+                                        <label className="text-[10px] text-gray-500 dark:text-[#8F9BB3] uppercase font-bold tracking-wider block mb-1.5">{t('currency')}</label>
+                                        <select value={quickTx.unitCur} onChange={e => setQuickTx({...quickTx, unitCur: e.target.value})} className="w-full bg-white dark:bg-[#0B0D14] text-blue-600 dark:text-[#3B82F6] p-3 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none font-bold">
+                                            <option>USD</option><option>USDT</option><option>THB</option><option>CNY</option>
+                                        </select>
+                                      </div>
+                                    </div>
+                                    <div className="flex gap-3">
+                                      <div className="flex-1">
+                                        <label className="text-[10px] text-gray-500 dark:text-[#8F9BB3] uppercase font-bold tracking-wider block mb-1.5">{t('rate')}</label>
+                                        <input
+                                          type="text"
+                                          inputMode="decimal"
+                                          value={formatInputStr(quickTx.rate)}
+                                          onChange={e => {
+                                              const raw = e.target.value.replace(/,/g, '');
+                                              if (raw === '' || /^-?\d*\.?\d*$/.test(raw)) setQuickTx({...quickTx, rate: raw});
+                                          }}
+                                          className="w-full bg-white dark:bg-[#0B0D14] text-gray-900 dark:text-white p-3 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none font-semibold transition-colors focus:border-blue-500 dark:focus:border-[#3B82F6]" placeholder="e.g. 21,600"
+                                        />
+                                      </div>
+                                      <div className="flex-1">
+                                        <label className="text-[10px] text-gray-500 dark:text-[#8F9BB3] uppercase font-bold tracking-wider block mb-1.5">{quickTx.resCur} {t('amount')}</label>
+                                        <input
+                                          type="text"
+                                          inputMode="decimal"
+                                          value={formatInputStr(quickTx.resAmt)}
+                                          onChange={e => {
+                                              const raw = e.target.value.replace(/,/g, '');
+                                              if (raw === '' || /^-?\d*\.?\d*$/.test(raw)) setQuickTx({...quickTx, resAmt: raw});
+                                          }}
+                                          className="w-full bg-white dark:bg-[#0B0D14] text-gray-900 dark:text-white p-3 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none font-semibold transition-colors focus:border-blue-500 dark:focus:border-[#3B82F6]" placeholder="Total"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="text-gray-500 dark:text-[#8F9BB3] text-sm font-semibold mb-1 text-center mt-2">{t('whichDirection')}</div>
+                                  <div className="flex gap-3">
+                                    <button onClick={() => saveQuickTx('receive_unit')} className="flex-1 bg-gray-50 dark:bg-[#1A202C] hover:bg-gray-100 dark:hover:bg-[#212836] border border-gray-200 dark:border-[#ffffff0a] py-4 rounded-2xl text-center active:scale-95 transition-all">
+                                      <div className="text-green-600 dark:text-[#10B981] font-bold text-sm">{t('receive')} {quickTx.unitCur}</div>
+                                      <div className="text-red-600 dark:text-[#EF4444] text-xs font-medium opacity-80 mt-1">{t('send')} {quickTx.resCur}</div>
+                                    </button>
+                                    <button onClick={() => saveQuickTx('receive_res')} className="flex-1 bg-gray-50 dark:bg-[#1A202C] hover:bg-gray-100 dark:hover:bg-[#212836] border border-gray-200 dark:border-[#ffffff0a] py-4 rounded-2xl text-center active:scale-95 transition-all">
+                                      <div className="text-green-600 dark:text-[#10B981] font-bold text-sm">{t('receive')} {quickTx.resCur}</div>
+                                      <div className="text-red-600 dark:text-[#EF4444] text-xs font-medium opacity-80 mt-1">{t('send')} {quickTx.unitCur}</div>
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <div className="flex justify-between items-center mb-6 bg-gray-50 dark:bg-[#1A202C] p-5 rounded-3xl border border-gray-200 dark:border-[#ffffff0a]">
+                                    <div>
+                                      <div className="text-gray-500 dark:text-[#8F9BB3] text-xs font-bold tracking-wider mb-1">{t('detectedRate')}</div>
+                                      <div className="text-gray-900 dark:text-white font-bold text-2xl">{formatDisplay(quickTx.rate)}</div>
+                                    </div>
+                                    <div className="text-right">
+                                      <div className="text-gray-500 dark:text-[#8F9BB3] text-xs font-bold tracking-wider mb-1">{t('currency')}</div>
+                                      <select value={quickTx.unitCur} onChange={e => setQuickTx({...quickTx, unitCur: e.target.value})} className="bg-white dark:bg-[#0B0D14] text-blue-600 dark:text-[#3B82F6] font-bold text-lg outline-none text-right px-3 py-1.5 rounded-xl border border-gray-200 dark:border-[#ffffff10]">
+                                        <option>USD</option><option>USDT</option><option>THB</option><option>CNY</option>
+                                      </select>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex justify-center mt-[-36px] mb-4 relative z-10">
+                                    <button onClick={handleSwapRateAmt} className="flex items-center gap-1.5 text-xs font-bold text-blue-600 dark:text-[#3B82F6] bg-white dark:bg-[#0B0D14] px-4 py-1.5 rounded-full border border-gray-200 dark:border-[#ffffff10] active:scale-95 transition-all shadow-sm shadow-blue-500/10 hover:bg-gray-50 dark:hover:bg-[#161b27]">
+                                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+                                      {t('swapRateAmt')}
+                                    </button>
+                                  </div>
+
+                                  <div className="text-gray-500 dark:text-[#8F9BB3] text-sm font-semibold mb-3 text-center">{t('whichDirection')}</div>
+
+                                  <div className="flex flex-col gap-3 mb-4">
+                                    <button onClick={() => saveQuickTx('receive_unit')} className="bg-gray-50 dark:bg-[#1A202C] hover:bg-gray-100 dark:hover:bg-[#212836] active:scale-[0.98] transition-all border border-gray-200 dark:border-[#ffffff0a] p-5 rounded-3xl flex justify-between items-center text-left group">
+                                      <div>
+                                        <div className="text-green-600 dark:text-[#10B981] font-bold text-lg flex items-center gap-2">
+                                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+                                          {t('receive')} {formatDisplay(quickTx.unitAmt, true)} {quickTx.unitCur}
+                                        </div>
+                                        <div className="text-red-600 dark:text-[#EF4444] font-bold text-base flex items-center gap-2 mt-1.5 opacity-90">
+                                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+                                          {t('send')} {formatDisplay(quickTx.resAmt, true)} {quickTx.resCur}
+                                        </div>
+                                      </div>
+                                      <div className="w-12 h-12 rounded-full bg-white dark:bg-[#0B0D14] border border-gray-200 dark:border-[#ffffff10] flex items-center justify-center text-gray-400 dark:text-[#8F9BB3] group-hover:bg-blue-600 dark:group-hover:bg-[#3B82F6] group-hover:text-white dark:group-hover:text-white group-hover:border-blue-600 dark:group-hover:border-[#3B82F6] transition-colors shadow-sm">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                      </div>
+                                    </button>
+
+                                    <button onClick={() => saveQuickTx('receive_res')} className="bg-gray-50 dark:bg-[#1A202C] hover:bg-gray-100 dark:hover:bg-[#212836] active:scale-[0.98] transition-all border border-gray-200 dark:border-[#ffffff0a] p-5 rounded-3xl flex justify-between items-center text-left group">
+                                      <div>
+                                        <div className="text-green-600 dark:text-[#10B981] font-bold text-lg flex items-center gap-2">
+                                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+                                          {t('receive')} {formatDisplay(quickTx.resAmt, true)} {quickTx.resCur}
+                                        </div>
+                                        <div className="text-red-600 dark:text-[#EF4444] font-bold text-base flex items-center gap-2 mt-1.5 opacity-90">
+                                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="19" x2="12" y2="5"></line><polyline points="5 12 12 5 19 12"></polyline></svg>
+                                          {t('send')} {formatDisplay(quickTx.unitAmt, true)} {quickTx.unitCur}
+                                        </div>
+                                      </div>
+                                      <div className="w-12 h-12 rounded-full bg-white dark:bg-[#0B0D14] border border-gray-200 dark:border-[#ffffff10] flex items-center justify-center text-gray-400 dark:text-[#8F9BB3] group-hover:bg-blue-600 dark:group-hover:bg-[#3B82F6] group-hover:text-white dark:group-hover:text-white group-hover:border-blue-600 dark:group-hover:border-[#3B82F6] transition-colors shadow-sm">
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                      </div>
+                                    </button>
+                                  </div>
+                                </>
+                              )}
+                            </>
+                        ) : (
+                            <div className="flex flex-col gap-4">
+                               <div className="bg-orange-50/50 dark:bg-[#1A202C] p-5 rounded-3xl border border-orange-100/50 dark:border-[#ffffff0a]">
+                                  <div className="text-gray-500 dark:text-[#8F9BB3] text-sm font-semibold mb-4 text-center">{t('transferFeeRecord')}</div>
+                                  <div className="flex gap-3 mb-2">
+                                     <div className="flex-1">
+                                       <label className="text-[10px] text-gray-500 dark:text-[#8F9BB3] uppercase font-bold tracking-wider block mb-1.5">{t('amount')}</label>
+                                       <input
+                                          type="text"
+                                          inputMode="decimal"
+                                          value={formatInputStr(transferTx.amt)}
+                                          onChange={e => {
+                                              const raw = e.target.value.replace(/,/g, '');
+                                              if (raw === '' || /^-?\d*\.?\d*$/.test(raw)) setTransferTx({...transferTx, amt: raw});
+                                          }}
+                                          className="w-full bg-white dark:bg-[#0B0D14] text-gray-900 dark:text-white p-4 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none font-bold text-2xl transition-colors focus:border-orange-500 dark:focus:border-[#F97316]"
+                                       />
+                                     </div>
+                                     <div className="w-28">
+                                       <label className="text-[10px] text-gray-500 dark:text-[#8F9BB3] uppercase font-bold tracking-wider block mb-1.5">{t('currency')}</label>
+                                       <select value={transferTx.cur} onChange={e => setTransferTx({...transferTx, cur: e.target.value})} className="w-full bg-white dark:bg-[#0B0D14] text-orange-600 dark:text-[#F97316] p-4 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none font-bold text-xl">
+                                          <option>THB</option><option>USD</option><option>USDT</option><option>CNY</option><option>LAK</option>
+                                       </select>
+                                     </div>
+                                  </div>
+                               </div>
+
+                               <div className="flex gap-3 mt-2">
+                                   <button onClick={() => saveTransferTx('in')} className="flex-1 bg-green-50 dark:bg-[#10B981]/10 hover:bg-green-100 dark:hover:bg-[#10B981]/20 border border-green-200 dark:border-[#10B981]/30 py-5 rounded-3xl text-center active:scale-95 transition-all">
+                                     <div className="text-green-600 dark:text-[#10B981] font-bold text-lg">{t('receivedBtn')}</div>
+                                     <div className="text-green-600/70 dark:text-[#10B981]/70 text-xs font-medium mt-1">{t('addToBalance')}</div>
+                                   </button>
+                                   <button onClick={() => saveTransferTx('out')} className="flex-1 bg-red-50 dark:bg-[#EF4444]/10 hover:bg-red-100 dark:hover:bg-[#EF4444]/20 border border-red-200 dark:border-[#EF4444]/30 py-5 rounded-3xl text-center active:scale-95 transition-all">
+                                     <div className="text-red-600 dark:text-[#EF4444] font-bold text-lg">{t('sentBtn')}</div>
+                                     <div className="text-red-600/70 dark:text-[#EF4444]/70 text-xs font-medium mt-1">{t('subFromBalance')}</div>
+                                   </button>
+                               </div>
+                            </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+                {/* --- CONFIG MODAL --- */}
+                <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center transition-opacity duration-300 ${showLiquidityModal ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                  <div className={`bg-white dark:bg-[#131722] w-[90%] max-h-[85dvh] flex flex-col rounded-[32px] border border-gray-200 dark:border-[#ffffff10] transform transition-transform duration-300 shadow-2xl ${showLiquidityModal ? 'scale-100' : 'scale-95'}`}>
+
+                    {/* Header (Sticky) */}
+                    <div className="p-6 pb-4 shrink-0 border-b border-gray-100 dark:border-[#ffffff0a]">
+                      <h3 className="text-gray-900 dark:text-white text-xl font-bold mb-1">{t('configTitle')}</h3>
+                      <p className="text-gray-500 dark:text-[#8F9BB3] text-xs font-medium m-0">{t('configDesc')}</p>
+                    </div>
+
+                    {/* Scrollable Content */}
+                    <div id="config-scroll-container" className="p-6 overflow-y-auto overscroll-contain flex-1">
+                      <div className="mb-6">
+                         <h4 className="text-blue-600 dark:text-[#3B82F6] text-xs font-bold uppercase tracking-wider mb-3">{t('marketRatesMargin')}</h4>
+                         <div className="grid grid-cols-2 gap-2 mb-3">
+                           {poolOrder.filter(c => c !== 'LAK').map(cur => (
+                             <div key={`rate-${cur}`} className="bg-gray-50 dark:bg-[#1A202C] p-2.5 rounded-2xl border border-gray-100 dark:border-[#ffffff0a]">
+                               <label className="text-[10px] text-gray-500 dark:text-[#8F9BB3] uppercase font-bold block mb-1.5 text-center">{cur}/LAK</label>
+                               <input type="number" autoComplete="off" data-1p-ignore value={configForm.rates?.[cur] ?? ''} onChange={e => setConfigForm(p => ({...p, rates: {...p.rates, [cur]: e.target.value}}))} className="w-full bg-white dark:bg-[#0B0D14] text-gray-900 dark:text-white p-2 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none text-sm font-semibold text-center focus:border-blue-500 dark:focus:border-[#3B82F6] transition-colors" />
+                             </div>
+                           ))}
+                         </div>
+                         <div className="bg-gray-50 dark:bg-[#1A202C] p-4 rounded-2xl border border-gray-100 dark:border-[#ffffff0a] flex justify-between items-center">
+                           <label className="text-xs text-gray-500 dark:text-[#8F9BB3] uppercase font-bold">{t('targetMargin')}</label>
+                           <input type="number" step="0.01" autoComplete="off" data-1p-ignore value={configForm.margin} onChange={e => setConfigForm(p => ({...p, margin: e.target.value}))} className="w-24 bg-white dark:bg-[#0B0D14] text-blue-600 dark:text-[#3B82F6] p-2 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none text-base font-bold text-center focus:border-blue-500 dark:focus:border-[#3B82F6] transition-colors" />
+                         </div>
+                      </div>
+
+                      <h4 className="text-blue-600 dark:text-[#3B82F6] text-xs font-bold uppercase tracking-wider mb-3 mt-6">{t('poolsSetup')}</h4>
+                      <div className="flex flex-col gap-3 mb-2">
+                        {poolOrder.map(cur => (
+                          <div key={`pool-${cur}`} className="bg-gray-50 dark:bg-[#1A202C] p-4 rounded-2xl border border-gray-100 dark:border-[#ffffff0a]">
+                            <div className="text-gray-900 dark:text-white font-bold mb-3 text-sm">{cur} {t('pool')}</div>
+                            <div className="flex gap-3">
+                              <div className="flex-1">
+                                <label className="text-[10px] text-gray-500 dark:text-[#8F9BB3] uppercase font-bold block mb-1.5">{t('openingBal')}</label>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={formatInputStr(configForm.balances?.[cur] ?? '')}
+                                  onChange={e => {
+                                    const raw = e.target.value.replace(/,/g, '');
+                                    if (raw === '' || /^-?\d*\.?\d{0,2}$/.test(raw)) setConfigForm(p => ({...p, balances: {...p.balances, [cur]: raw}}));
+                                  }}
+                                  className="w-full bg-white dark:bg-[#0B0D14] text-gray-900 dark:text-white p-2.5 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none text-sm font-semibold focus:border-blue-500 dark:focus:border-[#3B82F6] transition-colors"
+                                />
+                              </div>
+                              <div className="flex-1">
+                                <label className="text-[10px] text-red-500 dark:text-[#EF4444] uppercase font-bold block mb-1.5">{t('alertBelow')}</label>
+                                <input
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={formatInputStr(configForm.thresholds?.[cur] ?? '')}
+                                  onChange={e => {
+                                    const raw = e.target.value.replace(/,/g, '');
+                                    if (raw === '' || /^-?\d*\.?\d{0,2}$/.test(raw)) setConfigForm(p => ({...p, thresholds: {...p.thresholds, [cur]: raw}}));
+                                  }}
+                                  className="w-full bg-white dark:bg-[#0B0D14] text-red-600 dark:text-[#EF4444] p-2.5 rounded-xl border border-red-200 dark:border-[#EF4444]/30 outline-none text-sm font-semibold focus:border-red-500 dark:focus:border-[#EF4444] transition-colors"
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Footer (Sticky) */}
+                    <div className="p-5 pt-4 shrink-0 border-t border-gray-100 dark:border-[#ffffff0a] flex gap-3 bg-white dark:bg-[#131722] rounded-b-[32px]">
+                      <button onClick={() => setShowLiquidityModal(false)} className="flex-1 bg-gray-200 dark:bg-[#1A202C] text-gray-800 dark:text-white py-4 rounded-2xl font-bold hover:bg-gray-300 dark:hover:bg-[#212836] transition-colors">{t('cancel')}</button>
+                      <button onClick={handleSaveLiquidityConfig} className="flex-1 bg-blue-600 dark:bg-[#3B82F6] text-white py-4 rounded-2xl font-bold shadow-[0_4px_15px_rgba(59,130,246,0.3)] hover:bg-blue-700 dark:hover:bg-[#2563EB] transition-colors">{t('saveSetup')}</button>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* --- FULL TRANSACTION LOG OVERLAY (AUDIT) --- */}
+                <div className={`absolute inset-0 bg-white dark:bg-[#0B0D14] z-50 flex flex-col transition-all duration-300 ease-in-out ${showTxLogModal ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-full opacity-0 pointer-events-none'}`}>
+                  <div className="flex justify-between items-center p-5 border-b border-gray-200 dark:border-[#ffffff10] bg-gray-50 dark:bg-[#131722] shrink-0">
+                    <h2 className="text-gray-900 dark:text-white text-xl font-bold flex items-center gap-2">
+                      {t('txLog')}
+                      <span className="bg-blue-100 dark:bg-[#3B82F6]/20 text-blue-600 dark:text-[#3B82F6] text-xs px-2.5 py-0.5 rounded-full font-bold">{filteredLog.length}</span>
+                    </h2>
+                    <button onClick={() => setShowTxLogModal(false)} className="text-blue-600 dark:text-[#3B82F6] font-bold text-base active:opacity-70 bg-blue-50 dark:bg-[#3B82F6]/10 px-4 py-1.5 rounded-lg">{t('done')}</button>
+                  </div>
+
+                  <div className="p-4 border-b border-gray-200 dark:border-[#ffffff0a] bg-gray-50 dark:bg-[#131722] flex gap-3 items-center shrink-0">
+                    <div className="flex-1 relative">
+                      <input
+                        type="date"
+                        value={logDateFilter}
+                        onChange={(e) => setLogDateFilter(e.target.value)}
+                        className="w-full bg-white dark:bg-[#0B0D14] text-gray-900 dark:text-white px-4 py-3 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none text-sm font-semibold appearance-none"
+                      />
+                      {!logDateFilter && <span className="absolute left-4 top-3.5 text-gray-400 dark:text-[#8F9BB3] pointer-events-none text-sm font-semibold">{t('filterDate')}...</span>}
+                    </div>
+                    {logDateFilter && (
+                      <button onClick={() => setLogDateFilter('')} className="text-red-600 dark:text-[#EF4444] bg-red-50 dark:bg-[#EF4444]/10 px-4 py-3 rounded-xl text-sm font-bold active:scale-95 transition-all">{t('clear')}</button>
+                    )}
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto overscroll-contain p-4 flex flex-col pb-24">
+                    <div className="bg-white dark:bg-[#131722] rounded-2xl border border-gray-100 dark:border-[#ffffff05] flex flex-col shadow-sm">
+                      {filteredLog.length === 0 ? (
+                        <div className="text-center p-6 text-gray-400 dark:text-[#64748B] text-sm font-medium">No transactions found.</div>
+                      ) : (
+                        filteredLog.map((tx, idx, arr) => (
+                          <div key={tx.id} className={`shrink-0 py-3 px-4 flex items-center justify-between hover:bg-gray-50 dark:hover:bg-[#161b27] transition-colors relative group ${idx !== arr.length - 1 ? 'border-b border-gray-100 dark:border-[#ffffff0a]' : ''}`}>
+                            <div className="flex flex-col gap-1 w-[35%]">
+                              <span className="text-[9px] text-gray-400 dark:text-[#64748B] font-semibold tracking-wider uppercase">
+                                {new Date(tx.date).toLocaleDateString(undefined, {month:'short', day:'numeric'})} • {new Date(tx.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              </span>
+                              <div className="flex items-center">
+                                {tx.isAdjustment ? (
+                                  <span className="text-[10px] font-bold text-purple-600 dark:text-[#A855F7] bg-purple-50 dark:bg-[#A855F7]/10 px-1.5 py-0.5 rounded border border-purple-100 dark:border-[#A855F7]/20">Capital Adj.</span>
+                                ) : tx.isTransfer ? (
+                                  <span className="text-[10px] font-bold text-orange-600 dark:text-[#F97316] bg-orange-50 dark:bg-[#F97316]/10 px-1.5 py-0.5 rounded border border-orange-100 dark:border-[#F97316]/20">{t('transferMode')}</span>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-blue-600 dark:text-[#3B82F6] bg-blue-50 dark:bg-[#3B82F6]/10 px-1.5 py-0.5 rounded border border-blue-100 dark:border-[#3B82F6]/20">{tx.receiveCur} → {tx.sendCur}</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex flex-col items-center justify-center w-[25%] text-center">
+                              {tx.isAdjustment ? (
+                                <span className="text-[10px] text-purple-400 dark:text-[#A855F7]/60 font-medium">System</span>
+                              ) : tx.isTransfer ? (
+                                <span className="text-xs font-bold text-gray-400 dark:text-[#64748B]">-</span>
+                              ) : tx.rate > 0 ? (
+                                <span className="text-xs font-bold text-gray-700 dark:text-[#E2E8F0]">@{formatDisplay(tx.rate)}</span>
+                              ) : (
+                                <span className="text-[10px] text-gray-400">-</span>
+                              )}
+                            </div>
+
+                            <div className="flex flex-col items-end justify-center w-[40%] pr-7 relative">
+                              {tx.receiveCur !== 'SYS' && (
+                                <span className="text-sm font-bold text-green-600 dark:text-[#10B981] truncate w-full text-right">
+                                  +{formatDisplay(tx.receiveAmt, true)} <span className="text-[10px]">{tx.receiveCur}</span>
+                                </span>
+                              )}
+                              {tx.sendCur !== 'SYS' && (
+                                <span className="text-[11px] font-semibold text-red-500 dark:text-[#EF4444] truncate w-full text-right opacity-90">
+                                  -{formatDisplay(tx.sendAmt, true)} <span className="text-[10px]">{tx.sendCur}</span>
+                                </span>
+                              )}
+                              <button onClick={() => setTxToDelete(tx.id)} className="absolute right-0 top-1/2 -translate-y-1/2 text-gray-300 hover:text-red-500 dark:text-[#4B5563] dark:hover:text-[#EF4444] p-1.5 transition-colors active:scale-90">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                              </button>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+                {/* --- MENU MODAL --- */}
+                <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center transition-opacity duration-300 ${showMenuModal ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                  <div className={`bg-white dark:bg-[#131722] w-[85%] rounded-[32px] p-6 border border-gray-200 dark:border-[#ffffff10] transform transition-transform duration-300 shadow-2xl ${showMenuModal ? 'scale-100' : 'scale-95'}`}>
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-gray-900 dark:text-white text-xl font-bold">{t('options')}</h3>
+                      <button onClick={() => setShowMenuModal(false)} className="text-gray-400 dark:text-[#8F9BB3] bg-gray-100 dark:bg-[#1A202C] rounded-full p-1.5 active:scale-90 transition-transform"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                    </div>
+                    <div className="flex flex-col gap-3">
+
+                      <div className="flex flex-col gap-2 bg-gray-50 dark:bg-[#1A202C] border border-gray-100 dark:border-[#ffffff0a] p-4 rounded-2xl text-gray-900 dark:text-white text-sm font-semibold transition-colors">
+                        <div className="flex items-center gap-3 mb-1">
+                          <span className="text-gray-500 dark:text-[#8F9BB3] bg-gray-200 dark:bg-[#ffffff05] p-2 rounded-xl"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg></span>
+                          {t('theme')}
+                        </div>
+                        <div className="flex bg-gray-200 dark:bg-[#0B0D14] p-1 rounded-xl justify-between">
+                           <button onClick={() => setThemePref('light')} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${themePref==='light' ? 'bg-white dark:bg-[#3B82F6]/20 text-blue-600 dark:text-[#3B82F6] shadow-sm' : 'text-gray-500 dark:text-[#8F9BB3]'}`}>{t('light')}</button>
+                           <button onClick={() => setThemePref('dark')} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${themePref==='dark' ? 'bg-white dark:bg-[#3B82F6]/20 text-blue-600 dark:text-[#3B82F6] shadow-sm' : 'text-gray-500 dark:text-[#8F9BB3]'}`}>{t('dark')}</button>
+                           <button onClick={() => setThemePref('system')} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${themePref==='system' ? 'bg-white dark:bg-[#3B82F6]/20 text-blue-600 dark:text-[#3B82F6] shadow-sm' : 'text-gray-500 dark:text-[#8F9BB3]'}`}>{t('system')}</button>
+                        </div>
+                      </div>
+
+                      <button onClick={() => setLang(lang === 'EN' ? 'LA' : 'EN')} className="flex items-center justify-between bg-gray-50 dark:bg-[#1A202C] border border-gray-100 dark:border-[#ffffff0a] p-4 rounded-2xl text-gray-900 dark:text-white text-sm font-semibold hover:bg-gray-100 dark:hover:bg-[#212836] transition-colors active:scale-[0.98]">
+                        <div className="flex items-center gap-3">
+                          <span className="text-gray-500 dark:text-[#8F9BB3] bg-gray-200 dark:bg-[#ffffff05] p-2 rounded-xl"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg></span>
+                          {t('language')}
+                        </div>
+                        <span className="text-blue-600 dark:text-[#3B82F6] font-bold bg-blue-50 dark:bg-[#3B82F6]/10 px-3 py-1.5 rounded-lg">{lang === 'EN' ? 'English' : 'ພາສາລາວ'}</span>
+                      </button>
+
+                      <button onClick={() => { setShowMenuModal(false); window.location.href = 'mailto:info@smart-finex.com'; }} className="flex items-center justify-between bg-gray-50 dark:bg-[#1A202C] border border-gray-100 dark:border-[#ffffff0a] p-4 rounded-2xl text-gray-900 dark:text-white text-sm font-semibold hover:bg-gray-100 dark:hover:bg-[#212836] transition-colors active:scale-[0.98]">
+                        <div className="flex items-center gap-3">
+                          <span className="text-blue-500 bg-blue-50 dark:bg-blue-500/10 p-2 rounded-xl"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg></span>
+                          {t('contact')}
+                        </div>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-400"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                      </button>
+
+                      <button onClick={() => { setShowMenuModal(false); setShowFeedbackModal(true); }} className="flex items-center justify-between bg-gray-50 dark:bg-[#1A202C] border border-gray-100 dark:border-[#ffffff0a] p-4 rounded-2xl text-gray-900 dark:text-white text-sm font-semibold hover:bg-gray-100 dark:hover:bg-[#212836] transition-colors active:scale-[0.98]">
+                        <div className="flex items-center gap-3">
+                          <span className="text-purple-500 bg-purple-50 dark:bg-purple-500/10 p-2 rounded-xl"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg></span>
+                          {t('requestReport')}
+                        </div>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-400"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                      </button>
+
+                      <button onClick={() => { setShowMenuModal(false); setShowExportModal(true); }} className="flex items-center justify-between bg-gray-50 dark:bg-[#1A202C] border border-gray-100 dark:border-[#ffffff0a] p-4 rounded-2xl text-gray-900 dark:text-white text-sm font-semibold hover:bg-gray-100 dark:hover:bg-[#212836] transition-colors active:scale-[0.98]">
+                        <div className="flex items-center gap-3">
+                          <span className="text-orange-500 bg-orange-50 dark:bg-orange-500/10 p-2 rounded-xl"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></span>
+                          {t('exportReport')}
+                        </div>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" className="text-gray-400"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                      </button>
+
+                      {(!user || user.isAnonymous) ? (
+                        <button onClick={() => { setShowMenuModal(false); setShowLoginModal(true); }} className="flex items-center justify-between bg-gray-50 dark:bg-[#1A202C] border border-gray-100 dark:border-[#ffffff0a] p-4 rounded-2xl text-gray-900 dark:text-white text-sm font-semibold hover:bg-gray-100 dark:hover:bg-[#212836] transition-colors active:scale-[0.98]">
+                          <div className="flex items-center gap-3">
+                            <span className="text-green-500 bg-green-50 dark:bg-green-500/10 p-2 rounded-xl"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3"/></svg></span>
+                            Sign In / Sync Data
+                          </div>
+                          <span className="text-gray-400 dark:text-[#8F9BB3] text-[10px] uppercase font-bold truncate max-w-[100px]">Not Synced</span>
+                        </button>
+                      ) : (
+                        <button onClick={() => { signOut(auth); setShowMenuModal(false); }} className="flex items-center justify-between bg-gray-50 dark:bg-[#1A202C] border border-gray-100 dark:border-[#ffffff0a] p-4 rounded-2xl text-gray-900 dark:text-white text-sm font-semibold hover:bg-gray-100 dark:hover:bg-[#212836] transition-colors active:scale-[0.98]">
+                        <div className="flex items-center gap-3">
+                          <span className="text-red-500 bg-red-50 dark:bg-red-500/10 p-2 rounded-xl"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path><polyline points="16 17 21 12 16 7"></polyline><line x1="21" y1="12" x2="9" y2="12"></line></svg></span>
+                          Sign Out
+                        </div>
+                        <span className={`${syncStatus === 'Synced' ? 'text-green-500' : 'text-red-500'} text-[10px] uppercase font-bold truncate max-w-[100px]`}>{syncStatus === 'Synced' ? user?.email : syncStatus}</span>
+                      </button>
+                    )}
+                    </div>
+
+                    <div className="text-center mt-2">
+                      <span className="text-gray-400 dark:text-[#64748B] text-[10px] font-bold tracking-widest">V 1.063 2026</span>
+                    </div>
+
+                  </div>
+                </div>
+
+                {/* --- INSTALL APP PROMPT MODAL --- */}
+                <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm z-[80] flex items-end sm:items-center justify-center transition-opacity duration-300 ${showInstallPrompt ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                  <div className={`bg-white dark:bg-[#131722] w-full sm:w-[85%] sm:rounded-[32px] rounded-t-[32px] p-6 pb-12 sm:pb-6 border-t sm:border border-gray-200 dark:border-[#ffffff10] shadow-[0_-10px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_-10px_50px_rgba(0,0,0,0.5)] transform transition-transform duration-300 ${showInstallPrompt ? 'translate-y-0 scale-100' : 'translate-y-full sm:translate-y-0 sm:scale-95'}`}>
+                    <div className="w-12 h-1.5 bg-gray-200 dark:bg-[#ffffff15] rounded-full mx-auto mb-6 sm:hidden"></div>
+
+                    <div className="flex flex-col items-center text-center mb-6">
+                      <div className="w-16 h-16 bg-blue-50 dark:bg-[#3B82F6]/10 rounded-2xl flex items-center justify-center mb-4 text-blue-600 dark:text-[#3B82F6] shadow-sm">
+                        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>
+                      </div>
+                      <h3 className="text-gray-900 dark:text-white text-xl font-bold mb-2">{t('installApp')}</h3>
+                      <p className="text-gray-500 dark:text-[#8F9BB3] text-sm font-medium px-2">{t('installDesc')}</p>
+                    </div>
+
+                    <div className="bg-gray-50 dark:bg-[#1A202C] rounded-2xl p-4 border border-gray-100 dark:border-[#ffffff0a] mb-6 flex flex-col gap-4">
+                      {/* iOS Instructions */}
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 bg-white dark:bg-[#0B0D14] p-1.5 rounded-lg border border-gray-200 dark:border-[#ffffff10] text-gray-700 dark:text-[#E2E8F0]">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path><polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line></svg>
+                        </div>
+                        <div className="flex flex-col text-left">
+                          <span className="text-xs font-bold text-gray-900 dark:text-white">{t('iosInst1')}</span>
+                          <span className="text-[11px] font-medium text-gray-500 dark:text-[#8F9BB3] mt-0.5">{t('iosInst2')}</span>
+                        </div>
+                      </div>
+
+                      <div className="h-px w-full bg-gray-200 dark:bg-[#ffffff0a]"></div>
+
+                      {/* Android Instructions */}
+                      <div className="flex items-start gap-3">
+                        <div className="mt-0.5 bg-white dark:bg-[#0B0D14] p-1.5 rounded-lg border border-gray-200 dark:border-[#ffffff10] text-gray-700 dark:text-[#E2E8F0]">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="1.5"></circle><circle cx="12" cy="5" r="1.5"></circle><circle cx="12" cy="19" r="1.5"></circle></svg>
+                        </div>
+                        <div className="flex flex-col text-left">
+                          <span className="text-xs font-bold text-gray-900 dark:text-white">{t('andInst1')}</span>
+                          <span className="text-[11px] font-medium text-gray-500 dark:text-[#8F9BB3] mt-0.5">{t('andInst2')}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col gap-3">
+                      <button onClick={() => handleDismissInstall(false)} className="w-full bg-blue-600 dark:bg-[#3B82F6] hover:bg-blue-700 dark:hover:bg-[#2563EB] text-white py-4 rounded-2xl font-bold shadow-[0_4px_15px_rgba(59,130,246,0.3)] transition-colors active:scale-[0.98]">
+                        {t('notNow')}
+                      </button>
+                      <button onClick={() => handleDismissInstall(true)} className="w-full bg-transparent text-gray-400 hover:text-gray-600 dark:text-[#64748B] dark:hover:text-[#8F9BB3] py-2 rounded-xl text-xs font-bold transition-colors">
+                        {t('dontShowAgain')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                {/* --- CONFIRM DELETE MODAL --- */}
+                <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm z-[90] flex items-center justify-center transition-opacity duration-300 ${txToDelete ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                  <div className={`bg-white dark:bg-[#131722] w-[85%] max-w-[320px] rounded-[32px] p-6 border border-gray-200 dark:border-[#ffffff10] text-center transform transition-transform duration-300 shadow-2xl ${txToDelete ? 'scale-100' : 'scale-95'}`}>
+                    <div className="w-16 h-16 bg-red-50 dark:bg-[#EF4444]/10 rounded-2xl mx-auto mb-5 flex items-center justify-center text-red-600 dark:text-[#EF4444]">
+                       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"></path><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                    </div>
+                    <h3 className="text-gray-900 dark:text-white text-xl font-bold mb-2 tracking-tight">Delete Transaction?</h3>
+                    <p className="text-gray-500 dark:text-[#8F9BB3] text-sm font-medium mb-6 px-2">{t('confirmDelete')}</p>
+                    <div className="flex gap-3">
+                      <button onClick={() => setTxToDelete(null)} className="flex-1 bg-gray-100 hover:bg-gray-200 dark:bg-[#1A202C] dark:hover:bg-[#212836] text-gray-700 dark:text-[#8F9BB3] font-bold py-3.5 rounded-2xl active:scale-95 transition-all">
+                        {t('cancel')}
+                      </button>
+                      <button onClick={executeDelete} className="flex-1 bg-red-600 hover:bg-red-700 dark:bg-[#EF4444] dark:hover:bg-[#DC2626] text-white font-bold py-3.5 rounded-2xl active:scale-95 transition-all shadow-[0_4px_15px_rgba(239,68,68,0.3)]">
+                        {t('yesDelete')}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* --- EXPORT REPORT MODAL --- */}
+                <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm z-[65] flex items-end transition-opacity duration-300 ${showExportModal ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                  <div className={`bg-white dark:bg-[#131722] w-full rounded-t-[32px] p-6 pb-28 border-t border-gray-200 dark:border-[#ffffff10] shadow-[0_-10px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_-10px_50px_rgba(0,0,0,0.5)] transform transition-transform duration-300 ${showExportModal ? 'translate-y-0' : 'translate-y-full'}`}>
+                    <div className="w-12 h-1.5 bg-gray-200 dark:bg-[#ffffff15] rounded-full mx-auto mb-6"></div>
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-gray-900 dark:text-white text-xl font-bold">{t('exportReport')}</h3>
+                      <button onClick={() => setShowExportModal(false)} className="text-gray-500 dark:text-[#8F9BB3] bg-gray-100 dark:bg-[#1A202C] rounded-full p-1.5 active:scale-90 transition-transform"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                    </div>
+
+                    <div className="flex flex-col gap-5">
+                      <div>
+                        <label className="text-[10px] text-gray-500 dark:text-[#8F9BB3] uppercase font-bold tracking-wider block mb-2">{t('selectDate')}</label>
+                        <input
+                          type="date"
+                          value={exportDate}
+                          onChange={(e) => setExportDate(e.target.value)}
+                          className="w-full bg-gray-50 dark:bg-[#0B0D14] text-gray-900 dark:text-white px-4 py-4 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none text-base font-semibold appearance-none"
+                        />
+                      </div>
+
+                      <div className="flex gap-3">
+                        <button onClick={handleCopyReport} className="flex-1 bg-gray-100 dark:bg-[#1A202C] hover:bg-gray-200 dark:hover:bg-[#212836] text-gray-900 dark:text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 transition-colors border border-gray-200 dark:border-[#ffffff0a] shadow-sm">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                          {t('copyText')}
+                        </button>
+                        <button onClick={handleDownloadReport} className="flex-1 bg-blue-600 dark:bg-[#3B82F6] hover:bg-blue-700 dark:hover:bg-[#2563EB] text-white py-4 rounded-2xl font-bold flex items-center justify-center gap-2 shadow-[0_4px_15px_rgba(59,130,246,0.3)] transition-colors">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                          {t('downloadTxt')}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* --- FEEDBACK MODAL --- */}
+                <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-end transition-opacity duration-300 ${showFeedbackModal ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                  <div className={`bg-white dark:bg-[#131722] w-full rounded-t-[32px] p-6 pb-28 border-t border-gray-200 dark:border-[#ffffff10] shadow-[0_-10px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_-10px_50px_rgba(0,0,0,0.5)] transform transition-transform duration-300 ${showFeedbackModal ? 'translate-y-0' : 'translate-y-full'}`}>
+                    <div className="w-12 h-1.5 bg-gray-200 dark:bg-[#ffffff15] rounded-full mx-auto mb-6"></div>
+                    {feedbackStatus === 'success' ? (
+                      <div className="flex flex-col items-center justify-center py-10">
+                        <div className="w-20 h-20 bg-green-50 dark:bg-[#10B981]/20 rounded-full flex items-center justify-center mb-4">
+                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </div>
+                        <h3 className="text-gray-900 dark:text-white text-xl font-bold">Thank You!</h3>
+                        <p className="text-gray-500 dark:text-[#8F9BB3] text-sm mt-2">Your feedback has been sent.</p>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex justify-between items-center mb-2">
+                          <h3 className="text-gray-900 dark:text-white text-xl font-bold">{t('requestReport')}</h3>
+                          <button onClick={() => setShowFeedbackModal(false)} className="text-gray-500 dark:text-[#8F9BB3] bg-gray-100 dark:bg-[#1A202C] rounded-full p-1.5 active:scale-90 transition-transform"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                        </div>
+                        <p className="text-gray-500 dark:text-[#8F9BB3] text-xs font-medium mb-6">{t('feedbackDesc')}</p>
+
+                        <div className="flex flex-col gap-4">
+                          <div>
+                            <label className="text-[10px] text-gray-500 dark:text-[#8F9BB3] uppercase font-bold tracking-wider block mb-1.5">{t('feedbackType')}</label>
+                            <select value={feedbackForm.type} onChange={e => setFeedbackForm({...feedbackForm, type: e.target.value})} className="w-full bg-gray-50 dark:bg-[#0B0D14] text-blue-600 dark:text-[#3B82F6] p-3.5 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none font-bold">
+                              <option value="featureReq">{t('featureReq')}</option>
+                              <option value="bugReport">{t('bugReport')}</option>
+                              <option value="generalAdvice">{t('generalAdvice')}</option>
+                            </select>
+                          </div>
+                          <div>
+                            <textarea
+                              value={feedbackForm.text}
+                              onChange={e => setFeedbackForm({...feedbackForm, text: e.target.value})}
+                              className="w-full bg-gray-50 dark:bg-[#0B0D14] text-gray-900 dark:text-white p-4 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none font-medium text-sm transition-colors focus:border-blue-500 dark:focus:border-[#3B82F6] min-h-[120px] resize-none"
+                              placeholder={t('feedbackPlaceholder')}
+                            ></textarea>
+                          </div>
+                          <button onClick={handleSubmitFeedback} disabled={!feedbackForm.text.trim() || feedbackStatus === 'submitting'} className="w-full mt-2 bg-blue-600 disabled:bg-blue-400 dark:bg-[#3B82F6] dark:disabled:bg-[#3B82F6]/50 hover:bg-blue-700 dark:hover:bg-[#2563EB] text-white py-4 rounded-2xl font-bold shadow-[0_4px_15px_rgba(59,130,246,0.3)] disabled:shadow-none transition-colors flex items-center justify-center gap-2">
+                            {feedbackStatus === 'submitting' ? <span className="animate-pulse">Sending...</span> : <>{t('submit')}</>}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* --- CHART MODAL --- */}
+                <div className={`absolute inset-0 bg-black/80 backdrop-blur-md z-[70] flex flex-col transition-all duration-300 ${selectedChart ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                  <div className={`bg-white dark:bg-[#0B0D14] w-full h-full flex flex-col transform transition-transform duration-300 ${selectedChart ? 'translate-y-0' : 'translate-y-full'}`}>
+                    <div className="flex justify-between items-center p-4 border-b border-gray-200 dark:border-[#ffffff10] bg-white dark:bg-[#131722] pt-12">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-gray-50 dark:bg-[#1A202C] flex items-center justify-center font-bold text-gray-700 dark:text-[#8F9BB3] border border-gray-200 dark:border-[#ffffff10] shadow-sm">{selectedChart?.symbol}</div>
+                        <div>
+                          <h3 className="text-gray-900 dark:text-white text-lg font-bold leading-tight">{selectedChart?.pair}</h3>
+                          <span className="text-gray-500 dark:text-[#8F9BB3] text-[10px] font-bold tracking-wider uppercase">{selectedChart?.name}</span>
+                        </div>
+                      </div>
+                      <button onClick={() => setSelectedChart(null)} className="text-gray-500 dark:text-[#8F9BB3] bg-gray-100 dark:bg-[#1A202C] rounded-full p-2 active:scale-90 transition-transform"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                    </div>
+                    <div className="flex-1 w-full bg-gray-50 dark:bg-[#050505] relative">
+                      {selectedChart && (
+                        <iframe src={`https://s.tradingview.com/widgetembed/?symbol=${selectedChart.tvSymbol}&interval=60&hidesidetoolbar=1&symboledit=0&saveimage=0&toolbarbg=F1F3F6&theme=${isDark ? 'dark' : 'light'}&style=1&timezone=Etc%2FUTC&locale=en`} className="absolute inset-0 w-full h-full" frameBorder="0" allowTransparency="true" scrolling="no"></iframe>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* --- SET ALERT MODAL --- */}
+                <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end transition-opacity duration-300 ${showAlertModal ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                  <div className={`bg-white dark:bg-[#131722] w-full rounded-t-[32px] p-6 pb-28 border-t border-gray-200 dark:border-[#ffffff10] shadow-[0_-10px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_-10px_50px_rgba(0,0,0,0.5)] transform transition-transform duration-300 ${showAlertModal ? 'translate-y-0' : 'translate-y-full'}`}>
+                    <div className="w-12 h-1.5 bg-gray-200 dark:bg-[#ffffff15] rounded-full mx-auto mb-6"></div>
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-gray-900 dark:text-white text-xl font-bold">{t('setAlert')}</h3>
+                      <button onClick={() => setShowAlertModal(false)} className="text-gray-500 dark:text-[#8F9BB3] bg-gray-100 dark:bg-[#1A202C] rounded-full p-1.5 active:scale-90 transition-transform"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                    </div>
+
+                    <div className="flex flex-col gap-4">
+                      <div className="flex gap-3">
+                        <div className="flex-1">
+                          <label className="text-[10px] text-gray-500 dark:text-[#8F9BB3] uppercase font-bold tracking-wider block mb-1.5">{t('asset')}</label>
+                          <select value={newAlert.asset} onChange={e => setNewAlert({...newAlert, asset: e.target.value})} className="w-full bg-gray-50 dark:bg-[#0B0D14] text-blue-600 dark:text-[#3B82F6] p-3.5 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none font-bold">
+                            <option value="DXY">US Dollar Index (DXY)</option><option value="USDTHB">USD/THB</option><option value="CNYTHB">CNY/THB</option><option value="USDCNY">USD/CNY</option><option value="USDVND">USD/VND</option>
+                          </select>
+                        </div>
+                        <div className="flex-1">
+                          <label className="text-[10px] text-gray-500 dark:text-[#8F9BB3] uppercase font-bold tracking-wider block mb-1.5">{t('condition')}</label>
+                          <select value={newAlert.condition} onChange={e => setNewAlert({...newAlert, condition: e.target.value})} className="w-full bg-gray-50 dark:bg-[#0B0D14] text-gray-900 dark:text-white p-3.5 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none font-bold">
+                            <option value="above">{t('above')}</option><option value="below">{t('below')}</option>
+                          </select>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="text-[10px] text-gray-500 dark:text-[#8F9BB3] uppercase font-bold tracking-wider block mb-1.5">{t('targetPrice')}</label>
+                        <input type="number" value={newAlert.price} onChange={e => setNewAlert({...newAlert, price: e.target.value})} className="w-full bg-gray-50 dark:bg-[#0B0D14] text-gray-900 dark:text-white p-4 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none font-semibold text-lg transition-colors focus:border-blue-500 dark:focus:border-[#3B82F6]" placeholder={`e.g. ${formatDisplay(livePrices[newAlert.asset])}`} />
+                      </div>
+                      <button onClick={handleSaveAlert} className="w-full mt-2 bg-blue-600 dark:bg-[#3B82F6] hover:bg-blue-700 dark:hover:bg-[#2563EB] text-white py-4 rounded-2xl font-bold shadow-[0_4px_15px_rgba(59,130,246,0.3)] transition-colors">{t('saveAlert')}</button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* --- GOOGLE SIGN IN MODAL --- */}
+                <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center transition-opacity duration-300 ${showLoginModal ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                  <div className={`bg-white dark:bg-[#131722] w-[85%] rounded-[32px] p-8 border border-gray-200 dark:border-[#ffffff10] text-center transform transition-transform duration-300 shadow-2xl ${showLoginModal ? 'scale-100' : 'scale-95'}`}>
+                    <div className="w-16 h-16 bg-blue-50 dark:bg-[#3B82F6]/10 rounded-2xl mx-auto mb-5 flex items-center justify-center">
+                       <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#3B82F6" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    </div>
+                    <h3 className="text-gray-900 dark:text-white text-2xl font-bold mb-2 tracking-tight">Save Your Data</h3>
+                    <p className="text-gray-500 dark:text-[#8F9BB3] text-sm font-medium mb-6">Sign in to permanently save your transactions, profit tracker, and configurations. Otherwise, they will be lost if you clear your browser.</p>
+                    <div className="flex flex-col gap-3">
+                      <button onClick={handleGoogleSignIn} className="w-full bg-blue-600 hover:bg-blue-700 dark:bg-[#3B82F6] dark:hover:bg-[#2563EB] text-white font-bold py-3.5 rounded-xl flex items-center justify-center gap-3 active:scale-95 transition-all shadow-md">
+                        <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+                        Sign in with Google
+                      </button>
+                      <button onClick={handleSkipLogin} className="w-full bg-gray-100 hover:bg-gray-200 dark:bg-[#1A202C] dark:hover:bg-[#212836] text-gray-700 dark:text-[#8F9BB3] font-bold py-3.5 rounded-xl active:scale-95 transition-all">Skip for now</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        };
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
+
