@@ -21,23 +21,35 @@ The site is hosted on **Cloudflare**. To publish a new version:
 - Added missing on-screen labels (Working Profit, We Buy, We Sell) that were showing as raw code words.
 - Restored the "Scan Chat" AI instructions so photo-scanning of chat screenshots extracts transaction details correctly.
 
-## IMPORTANT: the AI "Scan Chat" key
+## The AI "Scan Chat" key (now kept secret on the server)
 
-For safety, the OpenRouter API key is **not** stored in this repository. In `index.html`
-you will find this line:
+The OpenRouter API key is **never** stored in this repository or in the webpage code.
+Putting a key in `index.html` would expose it to every visitor (a website file is
+downloaded to each visitor's browser), which is how the original key was drained.
 
-```js
-const openRouterApiKey = "PASTE_YOUR_OPENROUTER_API_KEY_HERE";
-```
+Instead, the key lives in a small server-side helper: **`functions/api/scan.js`** (a
+Cloudflare Pages Function). The website calls `/api/scan`, and that function reads the
+key from a private environment variable and talks to OpenRouter. Visitors never see it.
 
-Before the "Scan Chat" feature will work on the live site, replace that placeholder with
-a real key from https://openrouter.ai/keys in the copy you upload to Cloudflare.
+### One-time setup in Cloudflare
 
-> The previous key was exposed publicly (it shipped inside the webpage), so generate a
-> brand-new key on OpenRouter and delete the old one. Anyone could otherwise use it.
+1. Go to https://dash.cloudflare.com/ → **Workers & Pages** → your project.
+2. Open **Settings → Environment variables**.
+3. Add a variable named exactly **`OPENROUTER_API_KEY`** with your key from
+   https://openrouter.ai/keys as the value. Mark it as a **Secret** if offered.
+4. Save and **re-deploy** so the new value takes effect.
+
+> Make sure the deployed project includes the `functions/` folder (alongside
+> `index.html` and `images/`). Cloudflare turns it into the `/api/scan` endpoint
+> automatically.
 
 The rest of the app (calculator, tracker, market rates, Google sign-in, cloud sync) works
 without this key — only the photo-scanning feature needs it.
+
+### Tip: set a spending limit
+
+On the OpenRouter key page you can set a credit limit per key. Setting a small cap means
+that even in a worst case, spending is bounded.
 
 ## Notes
 

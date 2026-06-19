@@ -908,12 +908,12 @@ If any value cannot be determined from the image, use an empty string "" for tha
                 if (!res.ok) throw new Error("Canvas API Error");
                 data = await res.json(); responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
               } else {
-                const openRouterApiKey = "PASTE_YOUR_OPENROUTER_API_KEY_HERE";
-                const url = "https://openrouter.ai/api/v1/chat/completions";
-                const payload = { model: "google/gemini-2.5-flash", messages: [{ role: "user", content: [{ type: "text", text: prompt }, { type: "image_url", image_url: { url: `data:${mimeType};base64,${base64Data}` } }] }] };
-                const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openRouterApiKey}`, 'HTTP-Referer': window.location.origin, 'X-Title': 'Smart finEx' }, body: JSON.stringify(payload) });
-                if (!res.ok) { const errBody = await res.json().catch(() => ({})); throw new Error(errBody?.error?.message || `OpenRouter Error ${res.status}`); }
-                data = await res.json(); responseText = data.choices?.[0]?.message?.content || "{}";
+                // The API key is NOT here on purpose. The request goes to our own
+                // secure helper (/api/scan, a Cloudflare Function) which holds the
+                // key privately on the server, so visitors can never see or steal it.
+                const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ base64Data, mimeType }) });
+                if (!res.ok) { const errBody = await res.json().catch(() => ({})); throw new Error(errBody?.error?.message || `Scan Error ${res.status}`); }
+                data = await res.json(); responseText = data.responseText || "{}";
               }
               const jsonMatch = responseText.match(/\{[\s\S]*\}/);
               if (jsonMatch) {
