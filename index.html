@@ -82,7 +82,7 @@
 
         const DICT = {
           EN: {
-            calc: "Calculator", tracker: "Tracker", history: "History", copySave: "Copy & Save", copied: "Copied!", tapToCopy: "Tap number to copy",
+            calc: "Calculator", tracker: "Tracker", history: "History", copySave: "Copy & Save", copied: "Copied!", resultCopied: "Result Copied!", tapToCopy: "Tap to copy result",
             scanChat: "Scan Chat", scanning: "Scanning AI...", realizedProfit: "Realized Profit (Locked)",
             unrealizedValue: "Unrealized Value (Float)", liquidityPools: "Balance", configure: "Configure",
             suggestedRates: "Suggested Rates", margin: "MARGIN", recentList: "Recent Transactions", receive: "Receive",
@@ -107,7 +107,7 @@
             exchangeMode: "Exchange", transferMode: "Transfer", transferFeeRecord: "Transfer / Fee Record", receivedBtn: "Received", sentBtn: "Sent", addToBalance: "+ to Balance", subFromBalance: "- from Balance"
           },
           LA: {
-            calc: "ເຄື່ອງຄິດເລກ", tracker: "ຕິດຕາມ", history: "ປະຫວັດ", copySave: "ກັອບປີ້ & ບັນທຶກ", copied: "ກັອບປີ້ແລ້ວ!", tapToCopy: "ແຕະຕົວເລກເພື່ອກັອບປີ້",
+            calc: "ເຄື່ອງຄິດເລກ", tracker: "ຕິດຕາມ", history: "ປະຫວັດ", copySave: "ກັອບປີ້ & ບັນທຶກ", copied: "ກັອບປີ້ແລ້ວ!", resultCopied: "ກັອບປີ້ຜົນລວມແລ້ວ!", tapToCopy: "ແຕະເພື່ອກັອບປີ້ຜົນລວມ",
             scanChat: "ສະແກນແຊັດ", scanning: "ກຳລັງສະແກນ...", realizedProfit: "ກຳໄລທີ່ໄດ້ຮັບ (ລັອກ)",
             unrealizedValue: "ກຳໄລລອຍຕົວ (ຍັງບໍ່ຂາຍ)", liquidityPools: "ຍອດເງິນ", configure: "ຕັ້ງຄ່າ",
             suggestedRates: "ອັດຕາແນະນຳ", margin: "ກຳໄລ", recentList: "ລາຍການຫຼ້າສຸດ", receive: "ຮັບເຂົ້າ",
@@ -977,38 +977,48 @@
           };
 
           const analyzeChatImage = async (base64Data, mimeType) => {
-            const prompt = `You are a data extraction assistant for a money exchange business. Analyze this chat screenshot and extract the currency exchange transaction details. The supported currencies are USD, USDT, THB, CNY (foreign currencies) and LAK, THB (local settlement currencies). Return ONLY a single valid JSON object, with no extra text, in this exact shape:
-{
-  "unitAmt": "<the foreign currency amount being exchanged, digits only, no commas>",
-  "rate": "<the exchange rate, digits only, no commas>",
-  "resAmt": "<the resulting total amount, digits only, no commas>",
-  "unitCur": "<one of USD, USDT, THB, CNY>",
-  "resCur": "<one of LAK, THB>"
-}
-If any value cannot be determined from the image, use an empty string "" for that field. Do not guess wildly. Do not include explanations, markdown, or code fences — output the raw JSON object only.`;
-            let data = null; let responseText = "{}";
+            let data = null; let responseText = "[]"; let openMulti = false;
             try {
               if (isCanvas) {
                 const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-09-2025:generateContent?key=`;
-                const payload = { contents: [{ role: "user", parts: [{ text: prompt }, { inlineData: { mimeType: mimeType, data: base64Data } }] }] };
+                const canvasPrompt = `Extract all currency exchange transactions from this image as a JSON array. See /api/scan instructions.`;
+                const payload = { contents: [{ role: "user", parts: [{ text: canvasPrompt }, { inlineData: { mimeType: mimeType, data: base64Data } }] }] };
                 const res = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) });
                 if (!res.ok) throw new Error("Canvas API Error");
-                data = await res.json(); responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "{}";
+                data = await res.json(); responseText = data.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
               } else {
                 // The API key is NOT here on purpose. The request goes to our own
                 // secure helper (/api/scan, a Cloudflare Function) which holds the
                 // key privately on the server, so visitors can never see or steal it.
                 const res = await fetch('/api/scan', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ base64Data, mimeType }) });
                 if (!res.ok) { const errBody = await res.json().catch(() => ({})); throw new Error(errBody?.error?.message || `Scan Error ${res.status}`); }
-                data = await res.json(); responseText = data.responseText || "{}";
+                data = await res.json(); responseText = data.responseText || "[]";
               }
-              const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+              // Accept either a JSON array [...] or a single object {...}
+              const jsonMatch = responseText.match(/\[[\s\S]*\]|\{[\s\S]*\}/);
               if (jsonMatch) {
                 const parsed = JSON.parse(jsonMatch[0]);
-                setQuickTx({ unitAmt: parsed.unitAmt || '', rate: parsed.rate || '', resAmt: parsed.resAmt || '', unitCur: parsed.unitCur || 'USD', resCur: parsed.resCur || 'LAK', isManual: !(parsed.unitAmt && parsed.rate) });
+                const list = Array.isArray(parsed) ? parsed : [parsed];
+                const validTxs = list.map(p => ({
+                  unitAmt: parseFloat(String(p.unitAmt).replace(/,/g, '')) || 0,
+                  rate: parseFloat(String(p.rate).replace(/,/g, '')) || 0,
+                  resAmt: parseFloat(String(p.resAmt).replace(/,/g, '')) || 0,
+                  unitCur: p.unitCur || 'USD',
+                  resCur: p.resCur || 'LAK'
+                })).filter(tx => tx.unitAmt > 0);
+                if (validTxs.length > 1) {
+                  setMultiSaveCur({ unitCur: validTxs[0].unitCur, resCur: validTxs[0].resCur });
+                  setMultiSaveTxs(validTxs);
+                  openMulti = true;
+                } else if (validTxs.length === 1) {
+                  const p = validTxs[0];
+                  setQuickTx({ unitAmt: p.unitAmt, rate: p.rate, resAmt: p.resAmt, unitCur: p.unitCur, resCur: p.resCur, isManual: !(p.unitAmt && p.rate) });
+                } else {
+                  setQuickTx({ unitAmt: '', resAmt: '', rate: '', unitCur: 'USD', resCur: 'LAK', isManual: true });
+                }
               } else { setQuickTx({ unitAmt: '', resAmt: '', rate: '', unitCur: 'USD', resCur: 'LAK', isManual: true }); }
             } catch (err) { alert(`Scan Error: ${err.message}`); setQuickTx({ unitAmt: '', resAmt: '', rate: '', unitCur: 'USD', resCur: 'LAK', isManual: true }); }
-            finally { setIsScanning(false); setSaveMode('exchange'); setShowSaveModal(true); }
+            finally { setIsScanning(false); setSaveMode('exchange'); if (openMulti) setShowMultiSaveModal(true); else setShowSaveModal(true); }
           };
 
           const handleImageUpload = (event) => {
@@ -1492,7 +1502,7 @@ If any value cannot be determined from the image, use an empty string "" for tha
                       <div className="flex-1 overflow-y-auto flex flex-col justify-end space-y-[6px] mb-2 z-10 min-h-0 h-0" style={{ maskImage: 'linear-gradient(to bottom, transparent 0%, black 20%, black 100%)', WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 20%, black 100%)' }}>
                         {history.slice(0, 8).reverse().map((item, i) => (
                           <button key={i} onClick={() => handleCopyHistory(item.result, i)} className="w-full flex items-center justify-end gap-2 px-2 active:scale-[0.99] transition-transform group">
-                            {copiedHistIdx === i && <span className="text-[12px] font-bold text-green-600 dark:text-[#10B981] shrink-0">{t('copied')}</span>}
+                            {copiedHistIdx === i && <span className="text-[12px] font-bold text-green-600 dark:text-[#10B981] shrink-0">{t('resultCopied')}</span>}
                             <span className={`text-[20px] sm:text-[22px] font-medium tracking-wide text-right break-all transition-colors ${copiedHistIdx === i ? 'text-green-600 dark:text-[#10B981]' : 'text-gray-500 dark:text-[#8F9BB3] group-active:text-blue-600 dark:group-active:text-[#3B82F6]'}`}>
                               {item.fullEquation}
                             </span>
@@ -1504,7 +1514,7 @@ If any value cannot be determined from the image, use an empty string "" for tha
                         <span className="text-gray-500 dark:text-[#64748B] text-2xl font-medium h-8 mb-1 shrink-0 transition-all duration-200 block" style={{ opacity: ((!justEvaluated && tokens.length >= 3) || justEvaluated) ? 1 : 0 }}>
                           {justEvaluated
                             ? (resultCopied
-                                ? <span className="text-green-600 dark:text-[#10B981] text-base font-bold flex items-center justify-end gap-1.5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>{t('copied')}</span>
+                                ? <span className="text-green-600 dark:text-[#10B981] text-base font-bold flex items-center justify-end gap-1.5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>{t('resultCopied')}</span>
                                 : <span className="text-gray-400 dark:text-[#64748B] text-sm font-semibold flex items-center justify-end gap-1.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>{t('tapToCopy')}</span>)
                             : ((!justEvaluated && tokens.length >= 3) ? formatDisplay(runningTotal) : '')}
                         </span>
