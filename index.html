@@ -82,7 +82,7 @@
 
         const DICT = {
           EN: {
-            calc: "Calculator", tracker: "Tracker", history: "History", copySave: "Copy & Save", copied: "Copied!",
+            calc: "Calculator", tracker: "Tracker", history: "History", copySave: "Copy & Save", copied: "Copied!", tapToCopy: "Tap number to copy",
             scanChat: "Scan Chat", scanning: "Scanning AI...", realizedProfit: "Realized Profit (Locked)",
             unrealizedValue: "Unrealized Value (Float)", liquidityPools: "Balance", configure: "Configure",
             suggestedRates: "Suggested Rates", margin: "MARGIN", recentList: "Recent Transactions", receive: "Receive",
@@ -107,7 +107,7 @@
             exchangeMode: "Exchange", transferMode: "Transfer", transferFeeRecord: "Transfer / Fee Record", receivedBtn: "Received", sentBtn: "Sent", addToBalance: "+ to Balance", subFromBalance: "- from Balance"
           },
           LA: {
-            calc: "ເຄື່ອງຄິດເລກ", tracker: "ຕິດຕາມ", history: "ປະຫວັດ", copySave: "ກັອບປີ້ & ບັນທຶກ", copied: "ກັອບປີ້ແລ້ວ!",
+            calc: "ເຄື່ອງຄິດເລກ", tracker: "ຕິດຕາມ", history: "ປະຫວັດ", copySave: "ກັອບປີ້ & ບັນທຶກ", copied: "ກັອບປີ້ແລ້ວ!", tapToCopy: "ແຕະຕົວເລກເພື່ອກັອບປີ້",
             scanChat: "ສະແກນແຊັດ", scanning: "ກຳລັງສະແກນ...", realizedProfit: "ກຳໄລທີ່ໄດ້ຮັບ (ລັອກ)",
             unrealizedValue: "ກຳໄລລອຍຕົວ (ຍັງບໍ່ຂາຍ)", liquidityPools: "ຍອດເງິນ", configure: "ຕັ້ງຄ່າ",
             suggestedRates: "ອັດຕາແນະນຳ", margin: "ກຳໄລ", recentList: "ລາຍການຫຼ້າສຸດ", receive: "ຮັບເຂົ້າ",
@@ -214,6 +214,8 @@
           const [showHistory, setShowHistory] = useState(false);
           const [copiedIndex, setCopiedIndex] = useState(null);
           const [mainCopied, setMainCopied] = useState(false);
+          const [resultCopied, setResultCopied] = useState(false);
+          const [copiedHistIdx, setCopiedHistIdx] = useState(null);
 
           // Smart Cursor State for editing mid-equation
           const [cursorIndex, setCursorIndex] = useState(null);
@@ -756,6 +758,25 @@
             const el = document.createElement("textarea"); el.value = textToCopy; document.body.appendChild(el); el.select(); document.execCommand("copy"); document.body.removeChild(el);
             setMainCopied(true); setTimeout(() => setMainCopied(false), 2000);
             handleOpenSaveModal();
+          };
+
+          // Copy ONLY the plain result number (no operators, no commas) for pasting into banking apps
+          const copyPlainNumber = (val) => {
+            const clean = String(val).replace(/,/g, '');
+            try {
+              if (navigator.clipboard && navigator.clipboard.writeText) { navigator.clipboard.writeText(clean); return; }
+            } catch (e) {}
+            const el = document.createElement("textarea");
+            el.value = clean; el.style.position = 'fixed'; el.style.opacity = '0';
+            document.body.appendChild(el); el.focus(); el.select(); document.execCommand("copy"); document.body.removeChild(el);
+          };
+          const handleCopyResult = (val) => {
+            copyPlainNumber(val);
+            setResultCopied(true); setTimeout(() => setResultCopied(false), 1500);
+          };
+          const handleCopyHistory = (val, idx) => {
+            copyPlainNumber(val);
+            setCopiedHistIdx(idx); setTimeout(() => setCopiedHistIdx(null), 1500);
           };
 
           const guessCurrencyFromRate = (val) => {
@@ -1470,15 +1491,22 @@ If any value cannot be determined from the image, use an empty string "" for tha
                     <div className="flex-1 w-full flex flex-col overflow-hidden relative min-h-0 h-0 mb-4 px-3">
                       <div className="flex-1 overflow-y-auto flex flex-col justify-end space-y-[6px] mb-2 z-10 min-h-0 h-0" style={{ maskImage: 'linear-gradient(to bottom, transparent 0%, black 20%, black 100%)', WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 20%, black 100%)' }}>
                         {history.slice(0, 8).reverse().map((item, i) => (
-                          <div key={i} className="text-gray-500 dark:text-[#8F9BB3] text-[20px] sm:text-[22px] font-medium tracking-wide text-right w-full break-all px-2 transition-colors">
-                            {item.fullEquation}
-                          </div>
+                          <button key={i} onClick={() => handleCopyHistory(item.result, i)} className="w-full flex items-center justify-end gap-2 px-2 active:scale-[0.99] transition-transform group">
+                            {copiedHistIdx === i && <span className="text-[12px] font-bold text-green-600 dark:text-[#10B981] shrink-0">{t('copied')}</span>}
+                            <span className={`text-[20px] sm:text-[22px] font-medium tracking-wide text-right break-all transition-colors ${copiedHistIdx === i ? 'text-green-600 dark:text-[#10B981]' : 'text-gray-500 dark:text-[#8F9BB3] group-active:text-blue-600 dark:group-active:text-[#3B82F6]'}`}>
+                              {item.fullEquation}
+                            </span>
+                          </button>
                         ))}
                       </div>
 
                       <div className="shrink-0 flex flex-col items-end z-20 px-2 w-full max-h-[140px] overflow-y-auto overscroll-contain">
-                        <span className="text-gray-500 dark:text-[#64748B] text-2xl font-medium h-8 mb-1 shrink-0 transition-all duration-200 block" style={{ opacity: (!justEvaluated && tokens.length >= 3) ? 1 : 0 }}>
-                          {(!justEvaluated && tokens.length >= 3) ? formatDisplay(runningTotal) : ''}
+                        <span className="text-gray-500 dark:text-[#64748B] text-2xl font-medium h-8 mb-1 shrink-0 transition-all duration-200 block" style={{ opacity: ((!justEvaluated && tokens.length >= 3) || justEvaluated) ? 1 : 0 }}>
+                          {justEvaluated
+                            ? (resultCopied
+                                ? <span className="text-green-600 dark:text-[#10B981] text-base font-bold flex items-center justify-end gap-1.5"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>{t('copied')}</span>
+                                : <span className="text-gray-400 dark:text-[#64748B] text-sm font-semibold flex items-center justify-end gap-1.5"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>{t('tapToCopy')}</span>)
+                            : ((!justEvaluated && tokens.length >= 3) ? formatDisplay(runningTotal) : '')}
                         </span>
                         <div className="text-gray-900 dark:text-white font-semibold tracking-tight w-full flex flex-wrap justify-end leading-[1.1] transition-colors" style={{
                           fontSize: getDisplayText().length > 22 ? '24px' : getDisplayText().length > 18 ? '28px' : getDisplayText().length > 14 ? '34px' : getDisplayText().length > 10 ? '44px' : '56px',
@@ -1487,8 +1515,11 @@ If any value cannot be determined from the image, use an empty string "" for tha
                           {tokens.map((t, idx) => (
                             <span
                               key={idx}
-                              onClick={() => { if (!isOperator(t) && !justEvaluated) setCursorIndex(cursorIndex === idx ? null : idx); }}
-                              className={`inline-block whitespace-nowrap transition-colors duration-200 ${cursorIndex === idx ? 'bg-blue-100 dark:bg-[#3B82F6]/30 text-blue-600 dark:text-[#3B82F6] rounded-xl px-1.5 -mx-1.5 cursor-pointer' : (!isOperator(t) && !justEvaluated ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-[#ffffff0a] rounded-xl px-1.5 -mx-1.5' : '')}`}
+                              onClick={() => {
+                                if (justEvaluated) { if (!isOperator(t)) handleCopyResult(t); }
+                                else if (!isOperator(t)) setCursorIndex(cursorIndex === idx ? null : idx);
+                              }}
+                              className={`inline-block whitespace-nowrap transition-colors duration-200 ${cursorIndex === idx ? 'bg-blue-100 dark:bg-[#3B82F6]/30 text-blue-600 dark:text-[#3B82F6] rounded-xl px-1.5 -mx-1.5 cursor-pointer' : (justEvaluated && !isOperator(t) ? `cursor-pointer rounded-xl px-1.5 -mx-1.5 ${resultCopied ? 'text-green-600 dark:text-[#10B981]' : 'active:bg-green-50 dark:active:bg-[#10B981]/10'}` : (!isOperator(t) && !justEvaluated ? 'cursor-pointer hover:bg-gray-100 dark:hover:bg-[#ffffff0a] rounded-xl px-1.5 -mx-1.5' : ''))}`}
                               style={{ maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis' }}
                             >
                               {isOperator(t) ? <span className="mx-1.5 text-blue-500 dark:text-[#3B82F6]">{t}</span> : formatDisplay(t)}
