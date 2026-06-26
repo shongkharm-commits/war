@@ -245,6 +245,11 @@
           const [showSaveModal, setShowSaveModal] = useState(false);
           const [isScanning, setIsScanning] = useState(false);
           const [txSuccess, setTxSuccess] = useState(false);
+          const [showMultiSaveModal, setShowMultiSaveModal] = useState(false);
+          const [multiSaveTxs, setMultiSaveTxs] = useState([]);
+          const [multiSaveCur, setMultiSaveCur] = useState({ unitCur: 'USD', resCur: 'LAK' });
+          const [multiSaveDir, setMultiSaveDir] = useState('receive_unit');
+          const [multiSaveSuccess, setMultiSaveSuccess] = useState(false);
 
           // Save Modal States (Exchange vs Transfer)
           const [saveMode, setSaveMode] = useState('exchange');
@@ -782,6 +787,48 @@
             });
           };
 
+          const parseMultiTxTokens = (toks) => {
+            // Detects pattern: num × num (+ num × num)+ — two or more pairs joined by +
+            const pairs = [];
+            let i = 0;
+            while (i < toks.length) {
+              const a = parseFloat(String(toks[i]).replace(/,/g, ''));
+              if (isNaN(a)) return null;
+              if (i + 2 > toks.length - 1 || toks[i + 1] !== '×') return null;
+              const b = parseFloat(String(toks[i + 2]).replace(/,/g, ''));
+              if (isNaN(b)) return null;
+              pairs.push({ a, b });
+              i += 3;
+              if (i < toks.length) {
+                if (toks[i] !== '+') return null;
+                i++;
+              }
+            }
+            return pairs.length >= 2 ? pairs : null;
+          };
+
+          const saveAllMultiTxs = (dir) => {
+            if (multiSaveSuccess) return;
+            setMultiSaveSuccess(true);
+            setTimeout(() => {
+              const now = Date.now();
+              const newTxs = multiSaveTxs.map((tx, i) => {
+                const base = { id: now + i, date: new Date().toISOString(), rate: tx.rate };
+                if (dir === 'receive_unit') {
+                  base.receiveAmt = tx.unitAmt; base.receiveCur = multiSaveCur.unitCur;
+                  base.sendAmt = tx.resAmt;    base.sendCur = multiSaveCur.resCur;
+                } else {
+                  base.receiveAmt = tx.resAmt; base.receiveCur = multiSaveCur.resCur;
+                  base.sendAmt = tx.unitAmt;   base.sendCur = multiSaveCur.unitCur;
+                }
+                return base;
+              });
+              const updatedList = [...newTxs, ...transactions];
+              setTransactions(updatedList); saveStateToCloud({ transactions: updatedList });
+            }, 10);
+            setTimeout(() => { setMultiSaveSuccess(false); setShowMultiSaveModal(false); handleClear(); }, 1500);
+          };
+
           const handleOpenSaveModal = () => {
             let evalResult = parseFloat(evaluateTokens(tokens));
             let eqTokens = [...tokens];
@@ -795,6 +842,25 @@
               setTokens([String(evalResult)]); setJustEvaluated(true);
             }
             if (isNaN(evalResult) || evalResult === 0) return;
+
+            // MULTI-TX: Detect pattern A×B+C×D+... and open batch-save modal
+            const multiPairs = parseMultiTxTokens(eqTokens);
+            if (multiPairs) {
+              const guessA = guessCurrencyFromRate(multiPairs[0].a);
+              const guessB = guessCurrencyFromRate(multiPairs[0].b);
+              const rateIsB = (guessB && !guessA) || (guessB && guessA && guessB.priority >= guessA.priority);
+              const bestGuess = rateIsB ? guessB : (guessA || null);
+              const txs = multiPairs.map(p => {
+                const unitAmt = rateIsB ? p.a : p.b;
+                const rate = rateIsB ? p.b : p.a;
+                return { unitAmt, rate, resAmt: unitAmt * rate };
+              });
+              setMultiSaveCur({ unitCur: bestGuess ? bestGuess.unitCur : 'USD', resCur: bestGuess ? bestGuess.resCur : 'LAK' });
+              setMultiSaveDir('receive_unit');
+              setMultiSaveTxs(txs);
+              setShowMultiSaveModal(true);
+              return;
+            }
 
             // SMART: Auto-Detect Fee Pattern (e.g., 55000 + 200 or 55000 - 200 where fee is <= 4%)
             let feePatternFound = false;
@@ -1345,7 +1411,7 @@ If any value cannot be determined from the image, use an empty string "" for tha
           const onClearClick = () => { if (isLongPressRef.current) return; handleClear(); };
 
           useEffect(() => {
-            if (activeTab !== 'calc' || showSaveModal || showHistory || showLiquidityModal || isScanning || showMenuModal || showTxLogModal) return;
+            if (activeTab !== 'calc' || showSaveModal || showMultiSaveModal || showHistory || showLiquidityModal || isScanning || showMenuModal || showTxLogModal) return;
             const handleKeyDown = (event) => {
               const { key } = event;
               if (/[0-9]/.test(key)) handleDigit(key);
@@ -1977,6 +2043,71 @@ If any value cannot be determined from the image, use an empty string "" for tha
                                </div>
                             </div>
                         )}
+                      </>
+                    )}
+                  </div>
+                </div>
+                {/* --- MULTI-SAVE MODAL --- */}
+                <div className={`absolute inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end transition-opacity duration-300 ${showMultiSaveModal ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+                  <div className={`bg-white dark:bg-[#131722] w-full rounded-t-[32px] p-6 pb-28 border-t border-gray-200 dark:border-[#ffffff10] shadow-[0_-10px_50px_rgba(0,0,0,0.1)] dark:shadow-[0_-10px_50px_rgba(0,0,0,0.5)] transform transition-transform duration-300 ${showMultiSaveModal ? 'translate-y-0' : 'translate-y-full'}`}>
+                    <div className="w-12 h-1.5 bg-gray-200 dark:bg-[#ffffff15] rounded-full mx-auto mb-4"></div>
+                    {multiSaveSuccess ? (
+                      <div className="flex flex-col items-center justify-center py-10">
+                        <div className="w-20 h-20 bg-green-50 dark:bg-[#10B981]/20 rounded-full flex items-center justify-center mb-4">
+                          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </div>
+                        <h3 className="text-gray-900 dark:text-white text-xl font-bold">{multiSaveTxs.length} Transactions Saved!</h3>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex justify-between items-center mb-5">
+                          <h3 className="text-gray-900 dark:text-white text-xl font-bold">Save {multiSaveTxs.length} Transactions</h3>
+                          <button onClick={() => setShowMultiSaveModal(false)} className="text-gray-500 dark:text-[#8F9BB3] bg-gray-100 dark:bg-[#1A202C] rounded-full p-1.5 active:scale-90 transition-transform"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                        </div>
+                        {/* Currency pickers */}
+                        <div className="flex gap-3 mb-4">
+                          <div className="flex-1 bg-gray-50 dark:bg-[#1A202C] p-3 rounded-2xl border border-gray-200 dark:border-[#ffffff0a]">
+                            <div className="text-[10px] text-gray-500 dark:text-[#8F9BB3] uppercase font-bold tracking-wider mb-1.5">Unit Currency</div>
+                            <select value={multiSaveCur.unitCur} onChange={e => setMultiSaveCur(p => ({...p, unitCur: e.target.value}))} className="w-full bg-white dark:bg-[#0B0D14] text-blue-600 dark:text-[#3B82F6] font-bold text-base outline-none px-2 py-1.5 rounded-xl border border-gray-200 dark:border-[#ffffff10]">
+                              <option>USD</option><option>USDT</option><option>THB</option><option>CNY</option>
+                            </select>
+                          </div>
+                          <div className="flex-1 bg-gray-50 dark:bg-[#1A202C] p-3 rounded-2xl border border-gray-200 dark:border-[#ffffff0a]">
+                            <div className="text-[10px] text-gray-500 dark:text-[#8F9BB3] uppercase font-bold tracking-wider mb-1.5">Result Currency</div>
+                            <select value={multiSaveCur.resCur} onChange={e => setMultiSaveCur(p => ({...p, resCur: e.target.value}))} className="w-full bg-white dark:bg-[#0B0D14] text-blue-600 dark:text-[#3B82F6] font-bold text-base outline-none px-2 py-1.5 rounded-xl border border-gray-200 dark:border-[#ffffff10]">
+                              <option>LAK</option><option>THB</option>
+                            </select>
+                          </div>
+                        </div>
+                        {/* Transaction list */}
+                        <div className="bg-gray-50 dark:bg-[#1A202C] rounded-2xl border border-gray-200 dark:border-[#ffffff0a] overflow-hidden mb-4">
+                          <div className="flex text-gray-500 dark:text-[#8F9BB3] text-[10px] uppercase font-bold tracking-wider border-b border-gray-200 dark:border-[#ffffff05] bg-gray-100 dark:bg-[#0B0D14] px-4 py-2">
+                            <div className="flex-1">Amount</div><div className="flex-1 text-center">Rate</div><div className="flex-1 text-right">Total</div>
+                          </div>
+                          {multiSaveTxs.map((tx, i) => (
+                            <div key={i} className={`flex items-center px-4 py-3 ${i < multiSaveTxs.length - 1 ? 'border-b border-gray-100 dark:border-[#ffffff05]' : ''}`}>
+                              <div className="flex-1 text-gray-900 dark:text-white font-bold text-sm">{formatDisplay(tx.unitAmt, true)} <span className="text-blue-600 dark:text-[#3B82F6] text-xs">{multiSaveCur.unitCur}</span></div>
+                              <div className="flex-1 text-center text-gray-500 dark:text-[#8F9BB3] text-xs font-semibold">×{formatDisplay(tx.rate)}</div>
+                              <div className="flex-1 text-right text-green-600 dark:text-[#10B981] font-bold text-sm">{formatDisplay(tx.resAmt, true)} <span className="text-[10px]">{multiSaveCur.resCur}</span></div>
+                            </div>
+                          ))}
+                          <div className="flex items-center px-4 py-2.5 border-t border-gray-200 dark:border-[#ffffff10] bg-gray-100 dark:bg-[#0B0D14]">
+                            <div className="flex-1 text-gray-500 dark:text-[#8F9BB3] text-xs font-bold uppercase tracking-wider">Total</div>
+                            <div className="text-green-600 dark:text-[#10B981] font-bold text-sm">{formatDisplay(multiSaveTxs.reduce((s, t) => s + t.resAmt, 0), true)} <span className="text-[10px]">{multiSaveCur.resCur}</span></div>
+                          </div>
+                        </div>
+                        {/* Direction */}
+                        <div className="text-gray-500 dark:text-[#8F9BB3] text-sm font-semibold mb-3 text-center">{t('whichDirection')}</div>
+                        <div className="flex gap-3">
+                          <button onClick={() => saveAllMultiTxs('receive_unit')} className="flex-1 bg-gray-50 dark:bg-[#1A202C] hover:bg-gray-100 dark:hover:bg-[#212836] border border-gray-200 dark:border-[#ffffff0a] py-4 rounded-2xl text-center active:scale-95 transition-all">
+                            <div className="text-green-600 dark:text-[#10B981] font-bold text-sm">{t('receive')} {multiSaveCur.unitCur}</div>
+                            <div className="text-red-600 dark:text-[#EF4444] text-xs font-medium opacity-80 mt-1">{t('send')} {multiSaveCur.resCur}</div>
+                          </button>
+                          <button onClick={() => saveAllMultiTxs('receive_res')} className="flex-1 bg-gray-50 dark:bg-[#1A202C] hover:bg-gray-100 dark:hover:bg-[#212836] border border-gray-200 dark:border-[#ffffff0a] py-4 rounded-2xl text-center active:scale-95 transition-all">
+                            <div className="text-green-600 dark:text-[#10B981] font-bold text-sm">{t('receive')} {multiSaveCur.resCur}</div>
+                            <div className="text-red-600 dark:text-[#EF4444] text-xs font-medium opacity-80 mt-1">{t('send')} {multiSaveCur.unitCur}</div>
+                          </button>
+                        </div>
                       </>
                     )}
                   </div>
