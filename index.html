@@ -1703,11 +1703,6 @@
                     {(() => {
                       const last7 = portfolioHistory.slice(-7);
                       const today = last7.length ? last7[last7.length - 1] : { workingProfit: 0, change: 0, txCount: 0 };
-                      const currentValue = last7.length ? last7[last7.length - 1].value : 0;
-                      const weekAgoValue = last7.length ? last7[0].value : 0;
-                      const weekChange = currentValue - weekAgoValue;
-                      const weekPct = weekAgoValue !== 0 ? (weekChange / Math.abs(weekAgoValue)) * 100 : 0;
-                      const isUp = weekChange >= 0;
 
                       const vals = last7.map(d => d.value);
                       const maxV = Math.max(...vals, 1);
@@ -1717,38 +1712,31 @@
                       const plotBottom = 82; const plotTop = 14; const plotHeight = plotBottom - plotTop;
                       const barH = (v) => Math.max(((v - baseline) / span) * plotHeight, 1.5);
 
+                      const wpUp = today.workingProfit >= 0;
                       return (
                         <button onClick={() => setShowPortfolioModal(true)} className="text-left w-full block bg-gradient-to-br from-blue-50/80 via-white to-white dark:from-[#171e30] dark:via-[#131722] dark:to-[#131722] p-5 sm:p-6 rounded-[28px] border border-blue-200 dark:border-[#2a3655] relative overflow-hidden shadow-[0_12px_40px_rgba(59,130,246,0.15)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.6)] active:scale-[0.99] transition-transform">
-                          <div className={`absolute top-[-25%] right-[-15%] w-[70%] h-[70%] rounded-full blur-[80px] pointer-events-none opacity-50 dark:opacity-25 transition-colors duration-1000 ${isUp ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                          <div className={`absolute top-[-25%] right-[-15%] w-[70%] h-[70%] rounded-full blur-[80px] pointer-events-none opacity-50 dark:opacity-25 transition-colors duration-1000 ${wpUp ? 'bg-green-400' : 'bg-red-400'}`}></div>
                           <div className="relative z-10">
                             <div className="flex justify-between items-center mb-1">
-                              <div className="text-gray-500 dark:text-[#8F9BB3] text-xs font-semibold uppercase tracking-wider">{t('portfolioValue')}</div>
+                              <div className="text-gray-500 dark:text-[#8F9BB3] text-xs font-semibold uppercase tracking-wider">{t('todayLabel')} {t('workingProfit')}</div>
                               <span className="text-[9px] font-bold text-blue-500 dark:text-[#3B82F6] uppercase tracking-wider flex items-center gap-1">{t('tapForHistory')} <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
                             </div>
-                            <div className="flex items-end justify-between mb-1">
-                              <div className="text-[28px] sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
-                                {formatDisplay(currentValue, true)} <span className="text-base sm:text-lg font-medium opacity-50">LAK</span>
-                              </div>
-                            </div>
-                            <div className={`text-xs sm:text-sm font-bold mb-4 flex items-center gap-1.5 ${isUp ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>
-                              {isUp ? '▲' : '▼'} {formatShort(Math.abs(weekChange))} LAK ({isUp ? '+' : '-'}{Math.abs(weekPct).toFixed(1)}%) <span className="text-gray-400 dark:text-[#64748B] font-semibold">· {t('last7days')}</span>
+                            <div className={`text-[32px] sm:text-4xl font-bold tracking-tight mb-4 ${wpUp ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>
+                              {today.workingProfit > 0 ? '+' : ''}{formatDisplay(today.workingProfit, true)} <span className="text-lg sm:text-xl font-medium opacity-50">LAK</span>
                             </div>
 
-                            <div className="grid grid-cols-3 gap-2 mb-5">
-                              <div className="bg-white/60 dark:bg-[#ffffff0a] rounded-2xl p-2.5 border border-gray-100/60 dark:border-[#ffffff08]">
-                                <div className="text-gray-400 dark:text-[#64748B] text-[9px] font-bold uppercase tracking-wider mb-1">{t('todayLabel')} {t('workingProfit')}</div>
-                                <div className={`font-bold text-sm tracking-tight ${today.workingProfit >= 0 ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>{today.workingProfit > 0 ? '+' : ''}{formatShort(today.workingProfit)}</div>
-                              </div>
-                              <div className="bg-white/60 dark:bg-[#ffffff0a] rounded-2xl p-2.5 border border-gray-100/60 dark:border-[#ffffff08]">
+                            <div className="grid grid-cols-2 gap-2 mb-5">
+                              <div className="bg-white/60 dark:bg-[#ffffff0a] rounded-2xl p-3 border border-gray-100/60 dark:border-[#ffffff08]">
                                 <div className="text-gray-400 dark:text-[#64748B] text-[9px] font-bold uppercase tracking-wider mb-1">{t('todayLabel')} {t('pnl')}</div>
-                                <div className={`font-bold text-sm tracking-tight ${today.change >= 0 ? 'text-blue-600 dark:text-[#3B82F6]' : 'text-orange-500 dark:text-[#F59E0B]'}`}>{today.change > 0 ? '+' : ''}{formatShort(today.change)}</div>
+                                <div className={`font-bold text-base tracking-tight ${today.change >= 0 ? 'text-blue-600 dark:text-[#3B82F6]' : 'text-orange-500 dark:text-[#F59E0B]'}`}>{today.change > 0 ? '+' : ''}{formatShort(today.change)} <span className="text-[10px] opacity-60">LAK</span></div>
                               </div>
-                              <div className="bg-white/60 dark:bg-[#ffffff0a] rounded-2xl p-2.5 border border-gray-100/60 dark:border-[#ffffff08]">
+                              <div className="bg-white/60 dark:bg-[#ffffff0a] rounded-2xl p-3 border border-gray-100/60 dark:border-[#ffffff08]">
                                 <div className="text-gray-400 dark:text-[#64748B] text-[9px] font-bold uppercase tracking-wider mb-1">{t('todayLabel')} {t('txns')}</div>
-                                <div className="font-bold text-sm tracking-tight text-gray-900 dark:text-white">{today.txCount}</div>
+                                <div className="font-bold text-base tracking-tight text-gray-900 dark:text-white">{today.txCount}</div>
                               </div>
                             </div>
 
+                            <div className="text-gray-500 dark:text-[#8F9BB3] text-xs font-semibold uppercase tracking-wider mb-1">{t('portfolioValue')}</div>
                             <div className="w-full h-[130px] relative">
                               <svg className="w-full h-full overflow-visible">
                                 {last7.map((d, i) => {
