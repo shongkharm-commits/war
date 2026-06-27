@@ -88,6 +88,7 @@
             suggestedRates: "Suggested Rates", margin: "MARGIN", recentList: "Recent Transactions", receive: "Receive",
             send: "Send", today: "TODAY", week: "WEEK", month: "MONTH", custom: "CUSTOM", smartLog: "Smart Log",
             workingProfit: "Working Profit", weBuy: "We Buy", weSell: "We Sell",
+            portfolioValue: "Portfolio Value", dailyHistory: "Daily Portfolio History", tapForHistory: "Tap chart for daily history", last7days: "Last 7 days", dayChange: "Day Change", noDataYet: "No data yet",
             noAutoDetect: "Couldn't auto-detect the rate. Please enter details:", fcyAmount: "FCY Amount",
             currency: "Currency", rate: "Rate", amount: "Amount", whichDirection: "Which direction is this exchange?",
             detectedRate: "DETECTED RATE", configTitle: "Configuration", configDesc: "Set your daily market rates, margin, and balances.",
@@ -113,6 +114,7 @@
             suggestedRates: "ອັດຕາແນະນຳ", margin: "ກຳໄລ", recentList: "ລາຍການຫຼ້າສຸດ", receive: "ຮັບເຂົ້າ",
             send: "ຈ່າຍອອກ", today: "ມື້ນີ້", week: "ອາທິດ", month: "ເດືອນ", custom: "ເລືອກມື້", smartLog: "ບັນທຶກອັດສະລິຍະ",
             workingProfit: "ກຳໄລ", weBuy: "ຮັບຊື້", weSell: "ຂາຍ",
+            portfolioValue: "ມູນຄ່າລວມ", dailyHistory: "ປະຫວັດມູນຄ່າລວມ ປະຈຳວັນ", tapForHistory: "ແຕະກຣາຟເພື່ອເບິ່ງປະຫວັດ", last7days: "7 ວັນຜ່ານມາ", dayChange: "ປ່ຽນແປງ", noDataYet: "ຍັງບໍ່ມີຂໍ້ມູນ",
             noAutoDetect: "ບໍ່ສາມາດກວດຫາອັດຕາແລກປ່ຽນ. ກະລຸນາປ້ອນຂໍ້ມູນ:", fcyAmount: "ຈຳນວນເງິນຕ່າງປະເທດ",
             currency: "ສະກຸນເງິນ", rate: "ເລດ", amount: "ຈຳນວນ", whichDirection: "ທິດທາງການແລກປ່ຽນຄືແນວໃດ?",
             detectedRate: "ເລດທີ່ກວດພົບ", configTitle: "ການຕັ້ງຄ່າ", configDesc: "ຕັ້ງຄ່າອັດຕາຕະຫຼາດ, ກຳໄລ ແລະ ຍອດເງິນ.",
@@ -263,6 +265,7 @@
           const [showExportModal, setShowExportModal] = useState(false);
           const [exportDate, setExportDate] = useState(() => new Date().toISOString().split('T')[0]);
           const [showTxLogModal, setShowTxLogModal] = useState(false);
+          const [showPortfolioModal, setShowPortfolioModal] = useState(false);
           const [logDateFilter, setLogDateFilter] = useState('');
           const [txToDelete, setTxToDelete] = useState(null);
           const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -583,6 +586,25 @@
             if (decPart !== undefined) result += '.' + decPart;
             else if (strVal.endsWith('.') && !isCurrency) result += '.';
             return isNegative ? '-' + result : result;
+          };
+
+          // Short money format: 2,000,000,000 -> "2,000M", 226,920,000 -> "227M", 45,000 -> "45K"
+          const formatShort = (val) => {
+            const num = Number(val) || 0;
+            const abs = Math.abs(num);
+            const sign = num < 0 ? '-' : '';
+            const grp = (s) => String(s).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+            if (abs >= 1e6) {
+              const m = abs / 1e6;
+              const str = m >= 100 ? Math.round(m).toString() : (Math.round(m * 10) / 10).toString();
+              return sign + grp(str) + 'M';
+            }
+            if (abs >= 1e3) {
+              const k = abs / 1e3;
+              const str = k >= 100 ? Math.round(k).toString() : (Math.round(k * 10) / 10).toString();
+              return sign + grp(str) + 'K';
+            }
+            return sign + Math.round(abs).toString();
           };
 
           const handleDigit = (d) => {
@@ -1403,6 +1425,95 @@
             return { totalWorkingProfit, cashGrowth: currentTotalCash - startTotalCash, chartData, balances: currentBal, buyStats, periodTxCount: periodTx.length, periodTxList: periodTx.reverse() };
           }, [transactions, marketRates, openingBalances, chartFilter, rateHistory]);
 
+          // Daily portfolio-value history (total holdings valued at each day's rates) for up to the last year.
+          const portfolioHistory = useMemo(() => {
+            const DAY = 24 * 60 * 60 * 1000;
+            const safeTx = Array.isArray(transactions) ? transactions : [];
+            const sortedTx = [...safeTx].sort((a, b) => new Date(a.date) - new Date(b.date));
+            const now = new Date();
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+            const sortedRateHistory = [...rateHistory].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+            const getRate = (cur, ts) => {
+              if (cur === 'LAK') return 1;
+              for (let i = sortedRateHistory.length - 1; i >= 0; i--) {
+                if (new Date(sortedRateHistory[i].date).getTime() <= ts) { const r = sortedRateHistory[i].rates[cur]; if (r) return r; }
+              }
+              return marketRates[cur] || 0;
+            };
+
+            // Range: from the first transaction's day up to today, capped to the last 365 days, minimum 7 days.
+            let firstDay = startOfToday;
+            if (sortedTx.length > 0) {
+              const f = new Date(sortedTx[0].date);
+              firstDay = new Date(f.getFullYear(), f.getMonth(), f.getDate()).getTime();
+            }
+            let rangeStart = Math.max(firstDay, startOfToday - 364 * DAY);
+            rangeStart = Math.min(rangeStart, startOfToday - 6 * DAY);
+
+            let bal = { LAK: Number(openingBalances.LAK) || 0, USD: Number(openingBalances.USD) || 0, USDT: Number(openingBalances.USDT) || 0, THB: Number(openingBalances.THB) || 0, CNY: Number(openingBalances.CNY) || 0 };
+            let fifo = { USD: { lakBuy: [], lakSell: [], thbBuy: [], thbSell: [] }, USDT: { lakBuy: [], lakSell: [], thbBuy: [], thbSell: [] }, THB: { lakBuy: [], lakSell: [] }, CNY: { lakBuy: [], lakSell: [], thbBuy: [], thbSell: [] } };
+
+            const processTx = (tx) => {
+              let wpLAK = 0, wpTHB = 0;
+              if (tx.receiveCur && bal[tx.receiveCur] !== undefined) bal[tx.receiveCur] += tx.receiveAmt;
+              if (tx.sendCur && bal[tx.sendCur] !== undefined) bal[tx.sendCur] -= tx.sendAmt;
+              if (tx.isTransfer || tx.isAdjustment) return { wpLAK, wpTHB };
+              ['USD', 'USDT', 'THB', 'CNY'].forEach(cur => {
+                if (tx.sendCur === 'LAK' && tx.receiveCur === cur) {
+                  let rate = tx.sendAmt / tx.receiveAmt, remaining = tx.receiveAmt;
+                  while (remaining > 0 && fifo[cur].lakSell.length > 0) { let s = fifo[cur].lakSell[0], m = Math.min(remaining, s.amt); wpLAK += m * (s.rate - rate); s.amt -= m; remaining -= m; if (s.amt === 0) fifo[cur].lakSell.shift(); }
+                  if (remaining > 0) fifo[cur].lakBuy.push({ amt: remaining, rate });
+                } else if (tx.receiveCur === 'LAK' && tx.sendCur === cur) {
+                  let rate = tx.receiveAmt / tx.sendAmt, remaining = tx.sendAmt;
+                  while (remaining > 0 && fifo[cur].lakBuy.length > 0) { let b = fifo[cur].lakBuy[0], m = Math.min(remaining, b.amt); wpLAK += m * (rate - b.rate); b.amt -= m; remaining -= m; if (b.amt === 0) fifo[cur].lakBuy.shift(); }
+                  if (remaining > 0) fifo[cur].lakSell.push({ amt: remaining, rate });
+                }
+                if (cur !== 'THB') {
+                  if (tx.sendCur === 'THB' && tx.receiveCur === cur) {
+                    let rate = tx.sendAmt / tx.receiveAmt, remaining = tx.receiveAmt;
+                    while (remaining > 0 && fifo[cur].thbSell.length > 0) { let s = fifo[cur].thbSell[0], m = Math.min(remaining, s.amt); wpTHB += m * (s.rate - rate); s.amt -= m; remaining -= m; if (s.amt === 0) fifo[cur].thbSell.shift(); }
+                    if (remaining > 0) fifo[cur].thbBuy.push({ amt: remaining, rate });
+                  } else if (tx.receiveCur === 'THB' && tx.sendCur === cur) {
+                    let rate = tx.receiveAmt / tx.sendAmt, remaining = tx.sendAmt;
+                    while (remaining > 0 && fifo[cur].thbBuy.length > 0) { let b = fifo[cur].thbBuy[0], m = Math.min(remaining, b.amt); wpTHB += m * (rate - b.rate); b.amt -= m; remaining -= m; if (b.amt === 0) fifo[cur].thbBuy.shift(); }
+                    if (remaining > 0) fifo[cur].thbSell.push({ amt: remaining, rate });
+                  }
+                }
+              });
+              return { wpLAK, wpTHB };
+            };
+
+            const valueOf = (b, ts) => (b.LAK || 0) + ['USD', 'USDT', 'THB', 'CNY'].reduce((s, c) => s + (b[c] || 0) * getRate(c, ts), 0);
+
+            // Replay transactions before the range to set up balances + FIFO inventory.
+            let txIdx = 0;
+            while (txIdx < sortedTx.length && new Date(sortedTx[txIdx].date).getTime() < rangeStart) { processTx(sortedTx[txIdx]); txIdx++; }
+
+            const days = [];
+            let prevValue = null;
+            for (let dayStart = rangeStart; dayStart <= startOfToday; dayStart += DAY) {
+              const dayEnd = dayStart + DAY - 1;
+              const balBeforeDay = { ...bal };
+              let wpLAK = 0, wpTHB = 0, txCount = 0;
+              while (txIdx < sortedTx.length && new Date(sortedTx[txIdx].date).getTime() <= dayEnd) {
+                const r = processTx(sortedTx[txIdx]);
+                wpLAK += r.wpLAK; wpTHB += r.wpTHB;
+                if (!sortedTx[txIdx].isAdjustment) txCount++;
+                txIdx++;
+              }
+              const value = valueOf(bal, dayEnd);
+              let unreal = 0;
+              if (prevValue !== null) {
+                ['USD', 'USDT', 'THB', 'CNY'].forEach(c => { unreal += (balBeforeDay[c] || 0) * (getRate(c, dayEnd) - getRate(c, dayStart - 1)); });
+              }
+              const workingProfit = wpLAK + wpTHB * (marketRates.THB || 0);
+              days.push({ ts: dayStart, value, change: prevValue === null ? 0 : value - prevValue, workingProfit, unrealizedPnL: unreal, txCount });
+              prevValue = value;
+            }
+            return days;
+          }, [transactions, marketRates, openingBalances, rateHistory]);
+
           const getSuggestedRate = (base, quote) => {
             const getLAKRates = (cur) => {
               let liveRate = marketRates[cur] || 0; let avgCost = 0;
@@ -1590,72 +1701,60 @@
                     </div>
 
                     {(() => {
-                      const cData = dashboardStats.chartData;
-                      const maxVal = Math.max(0, ...cData.map(d => Math.max(d.wp, d.cg)));
-                      const minVal = Math.min(0, ...cData.map(d => Math.min(d.wp, d.cg)));
-                      const paddedMax = maxVal + (maxVal - minVal) * 0.15 || 1000;
-                      const paddedMin = minVal - (maxVal - minVal) * 0.15 || -1000;
-                      const range = paddedMax - paddedMin || 2000;
+                      const last7 = portfolioHistory.slice(-7);
+                      const currentValue = last7.length ? last7[last7.length - 1].value : 0;
+                      const weekAgoValue = last7.length ? last7[0].value : 0;
+                      const weekChange = currentValue - weekAgoValue;
+                      const weekPct = weekAgoValue !== 0 ? (weekChange / Math.abs(weekAgoValue)) * 100 : 0;
+                      const isUp = weekChange >= 0;
 
-                      const plotBottom = 85; const plotTop = 5; const plotHeight = plotBottom - plotTop;
-                      const scaleY = (val) => plotBottom - (((val - paddedMin) / range) * plotHeight);
-                      const zeroY = scaleY(0);
-
-                      const filters = ['1D', '1W', '1M'];
-                      const isPositiveWP = dashboardStats.totalWorkingProfit >= 0;
-                      const isPositiveCG = dashboardStats.cashGrowth >= 0;
+                      const vals = last7.map(d => d.value);
+                      const maxV = Math.max(...vals, 1);
+                      const minV = Math.min(...vals, 0);
+                      const baseline = minV - (maxV - minV) * 0.35;
+                      const span = (maxV - baseline) || 1;
+                      const plotBottom = 82; const plotTop = 14; const plotHeight = plotBottom - plotTop;
+                      const barH = (v) => Math.max(((v - baseline) / span) * plotHeight, 1.5);
 
                       return (
-                        <div className="bg-gradient-to-br from-blue-50/80 via-white to-white dark:from-[#171e30] dark:via-[#131722] dark:to-[#131722] p-5 sm:p-6 rounded-[28px] border border-blue-200 dark:border-[#2a3655] relative overflow-hidden shadow-[0_12px_40px_rgba(59,130,246,0.15)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.6)]">
-                          <div className={`absolute top-[-25%] right-[-15%] w-[70%] h-[70%] rounded-full blur-[80px] pointer-events-none opacity-50 dark:opacity-25 transition-colors duration-1000 ${isPositiveWP ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                        <button onClick={() => setShowPortfolioModal(true)} className="text-left w-full block bg-gradient-to-br from-blue-50/80 via-white to-white dark:from-[#171e30] dark:via-[#131722] dark:to-[#131722] p-5 sm:p-6 rounded-[28px] border border-blue-200 dark:border-[#2a3655] relative overflow-hidden shadow-[0_12px_40px_rgba(59,130,246,0.15)] dark:shadow-[0_12px_40px_rgba(0,0,0,0.6)] active:scale-[0.99] transition-transform">
+                          <div className={`absolute top-[-25%] right-[-15%] w-[70%] h-[70%] rounded-full blur-[80px] pointer-events-none opacity-50 dark:opacity-25 transition-colors duration-1000 ${isUp ? 'bg-green-400' : 'bg-red-400'}`}></div>
                           <div className="relative z-10">
                             <div className="flex justify-between items-center mb-1">
-                              <div className="text-gray-500 dark:text-[#8F9BB3] text-xs font-semibold uppercase tracking-wider">{t('workingProfit')}</div>
-                              <div className="flex items-center gap-3 text-[9px] font-bold text-gray-400 dark:text-[#64748B] uppercase tracking-wider">
-                                <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-[3px] bg-green-500 dark:bg-[#10B981]"></div> WP</span>
-                                <span className="flex items-center gap-1.5"><div className="w-2.5 h-2.5 rounded-[3px] bg-blue-500 dark:bg-[#3B82F6]"></div> PnL</span>
+                              <div className="text-gray-500 dark:text-[#8F9BB3] text-xs font-semibold uppercase tracking-wider">{t('portfolioValue')}</div>
+                              <span className="text-[9px] font-bold text-blue-500 dark:text-[#3B82F6] uppercase tracking-wider flex items-center gap-1">{t('tapForHistory')} <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><polyline points="9 18 15 12 9 6"></polyline></svg></span>
+                            </div>
+                            <div className="flex items-end justify-between mb-1">
+                              <div className="text-[28px] sm:text-3xl font-bold tracking-tight text-gray-900 dark:text-white">
+                                {formatDisplay(currentValue, true)} <span className="text-base sm:text-lg font-medium opacity-50">LAK</span>
                               </div>
                             </div>
-                            <div className="flex justify-between items-end mb-1">
-                              <div className={`text-[28px] sm:text-3xl font-bold tracking-tight ${isPositiveWP ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>
-                                {isPositiveWP && dashboardStats.totalWorkingProfit > 0 ? '+' : ''}{formatDisplay(dashboardStats.totalWorkingProfit, true)} <span className="text-base sm:text-lg font-medium opacity-50">LAK</span>
-                              </div>
-                              <span className="text-[10px] font-bold bg-white/60 dark:bg-[#ffffff0a] backdrop-blur-md border border-gray-200/50 dark:border-[#ffffff10] px-2.5 py-1 rounded-lg text-gray-500 dark:text-[#8F9BB3] mb-1.5 shadow-sm">
-                                {dashboardStats.periodTxCount} {t('txns')}
-                              </span>
-                            </div>
-                            <div className={`text-xs sm:text-sm font-bold mb-6 flex items-center gap-1 ${isPositiveCG ? 'text-blue-600 dark:text-[#3B82F6]' : 'text-orange-500 dark:text-[#F59E0B]'}`}>
-                              {isPositiveCG ? '▲' : '▼'} {formatDisplay(Math.abs(dashboardStats.cashGrowth), true)} LAK {t('unrealizedPnL')}
+                            <div className={`text-xs sm:text-sm font-bold mb-6 flex items-center gap-1.5 ${isUp ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>
+                              {isUp ? '▲' : '▼'} {formatShort(Math.abs(weekChange))} LAK ({isUp ? '+' : '-'}{Math.abs(weekPct).toFixed(1)}%) <span className="text-gray-400 dark:text-[#64748B] font-semibold">· {t('last7days')}</span>
                             </div>
 
-                            <div className="w-full h-[120px] mb-6 relative">
+                            <div className="w-full h-[130px] relative">
                               <svg className="w-full h-full overflow-visible">
-                                <line x1="0%" y1={`${zeroY}%`} x2="100%" y2={`${zeroY}%`} stroke="#4B5563" strokeWidth="1" strokeDasharray="4" opacity="0.4" />
-                                {cData.map((d, i) => {
-                                  const xCenter = (i + 0.5) * (100 / (cData.length || 1));
-                                  const barWidth = Math.min(100 / (cData.length || 1) * 0.35, 6);
-                                  const wpY = scaleY(d.wp); const wpHeight = Math.abs(wpY - zeroY); const wpYStart = d.wp >= 0 ? wpY : zeroY;
-                                  const cgY = scaleY(d.cg); const cgHeight = Math.abs(cgY - zeroY); const cgYStart = d.cg >= 0 ? cgY : zeroY;
-                                  const showLabel = cData.length <= 8 || i % Math.ceil(cData.length / 6) === 0;
-
+                                {last7.map((d, i) => {
+                                  const slot = 100 / (last7.length || 1);
+                                  const xCenter = (i + 0.5) * slot;
+                                  const barWidth = Math.min(slot * 0.5, 9);
+                                  const h = barH(d.value);
+                                  const yTop = plotBottom - h;
+                                  const isLast = i === last7.length - 1;
                                   return (
                                     <g key={i}>
-                                      <rect x={`${xCenter - barWidth - 0.5}%`} y={`${wpYStart}%`} width={`${barWidth}%`} height={`${Math.max(wpHeight, 0.5)}%`} fill={d.wp >= 0 ? '#10B981' : '#EF4444'} rx="1.5" />
-                                      <rect x={`${xCenter + 0.5}%`} y={`${cgYStart}%`} width={`${barWidth}%`} height={`${Math.max(cgHeight, 0.5)}%`} fill={d.cg >= 0 ? '#3B82F6' : '#F59E0B'} rx="1.5" />
-                                      {showLabel && <text x={`${xCenter}%`} y="100%" fontSize="10px" fill="#8F9BB3" textAnchor="middle" style={{fontFamily: 'inherit'}}>{d.label}</text>}
+                                      <rect x={`${xCenter - barWidth / 2}%`} y={`${yTop}%`} width={`${barWidth}%`} height={`${h}%`} fill={isLast ? '#3B82F6' : '#93C5FD'} className="dark:opacity-90" rx="2" />
+                                      <text x={`${xCenter}%`} y={`${yTop - 2}%`} fontSize="8.5px" fontWeight="700" fill={isLast ? '#3B82F6' : '#8F9BB3'} textAnchor="middle" style={{fontFamily: 'inherit'}}>{formatShort(d.value)}</text>
+                                      <text x={`${xCenter}%`} y="98%" fontSize="9px" fill="#8F9BB3" textAnchor="middle" style={{fontFamily: 'inherit'}}>{new Date(d.ts).getDate()}/{new Date(d.ts).getMonth()+1}</text>
                                     </g>
                                   );
                                 })}
-                                {cData.length === 0 && <text x="50%" y="50%" fontSize="12px" fill="#8F9BB3" textAnchor="middle" style={{fontFamily: 'inherit'}}>No activity</text>}
+                                {last7.length === 0 && <text x="50%" y="50%" fontSize="12px" fill="#8F9BB3" textAnchor="middle" style={{fontFamily: 'inherit'}}>{t('noDataYet')}</text>}
                               </svg>
                             </div>
-                            <div className="flex bg-white/50 dark:bg-[#0B0D14]/50 backdrop-blur-md p-1 rounded-xl justify-between border border-blue-100/50 dark:border-[#ffffff05]">
-                              {filters.map(f => (
-                                <button key={f} onClick={() => setChartFilter(f)} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${chartFilter === f ? 'bg-white dark:bg-[#1A202C] text-blue-600 dark:text-[#3B82F6] shadow-sm border border-gray-200 dark:border-[#ffffff0a]' : 'text-gray-500 dark:text-[#8F9BB3] hover:text-gray-800 dark:hover:text-gray-200'}`}>{f}</button>
-                              ))}
-                            </div>
                           </div>
-                        </div>
+                        </button>
                       );
                     })()}
 
@@ -1740,8 +1839,13 @@
 
                     {/* Compact Recent Transactions */}
                     <div>
+                      <div className="flex bg-white/50 dark:bg-[#0B0D14]/50 p-1 rounded-xl justify-between border border-gray-200 dark:border-[#ffffff05] mb-3">
+                        {['1D', '1W', '1M'].map(f => (
+                          <button key={f} onClick={() => setChartFilter(f)} className={`flex-1 py-1.5 rounded-lg text-xs font-bold transition-all ${chartFilter === f ? 'bg-white dark:bg-[#1A202C] text-blue-600 dark:text-[#3B82F6] shadow-sm border border-gray-200 dark:border-[#ffffff0a]' : 'text-gray-500 dark:text-[#8F9BB3] hover:text-gray-800 dark:hover:text-gray-200'}`}>{f === '1D' ? 'Today' : f === '1W' ? '7 Days' : '30 Days'}</button>
+                        ))}
+                      </div>
                       <h3 className="text-gray-900 dark:text-white text-sm font-bold mb-3 flex justify-between items-center tracking-wide">
-                        {t('recentList')}
+                        {t('recentList')} <span className="text-gray-400 dark:text-[#64748B] text-[10px] font-bold">({dashboardStats.periodTxCount} {t('txns')})</span>
                         <button onClick={() => setShowTxLogModal(true)} className="text-blue-600 dark:text-[#3B82F6] text-[10px] uppercase font-bold bg-blue-50 dark:bg-[#3B82F6]/10 px-3 py-1.5 rounded-lg active:scale-95 transition-transform">{t('viewAll')}</button>
                       </h3>
                       <div className="max-h-[350px] overflow-y-auto">
@@ -2384,6 +2488,53 @@
                       <span className="text-gray-400 dark:text-[#64748B] text-[10px] font-bold tracking-widest">V 2026.6.26</span>
                     </div>
 
+                  </div>
+                </div>
+
+                {/* --- PORTFOLIO HISTORY MODAL --- */}
+                <div className={`absolute inset-0 bg-white dark:bg-[#0B0D14] z-50 flex flex-col transition-all duration-300 ease-in-out ${showPortfolioModal ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-full opacity-0 pointer-events-none'}`}>
+                  <div className="p-5 pt-10 shrink-0 border-b border-gray-100 dark:border-[#ffffff0a] flex justify-between items-center">
+                    <div>
+                      <h3 className="text-gray-900 dark:text-white text-xl font-bold">{t('dailyHistory')}</h3>
+                      <p className="text-gray-500 dark:text-[#8F9BB3] text-xs font-medium m-0 mt-0.5">{t('portfolioValue')} · {t('workingProfit')} · {t('unrealizedPnL')}</p>
+                    </div>
+                    <button onClick={() => setShowPortfolioModal(false)} className="text-gray-500 dark:text-[#8F9BB3] bg-gray-100 dark:bg-[#1A202C] rounded-full p-2 active:scale-90 transition-transform"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto overscroll-contain p-4 flex flex-col gap-2.5">
+                    {portfolioHistory.length === 0 && <div className="text-center p-10 text-gray-400 dark:text-[#64748B] text-sm font-medium">{t('noDataYet')}</div>}
+                    {[...portfolioHistory].reverse().map((d, i) => {
+                      const dateObj = new Date(d.ts);
+                      const dayName = dateObj.toLocaleDateString(lang === 'LA' ? 'lo-LA' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+                      const up = d.change >= 0;
+                      const wpUp = d.workingProfit >= 0;
+                      const unUp = d.unrealizedPnL >= 0;
+                      return (
+                        <div key={d.ts} className="bg-gray-50 dark:bg-[#131722] rounded-2xl border border-gray-100 dark:border-[#ffffff05] p-4">
+                          <div className="flex justify-between items-start mb-3">
+                            <div>
+                              <div className="text-gray-900 dark:text-white font-bold text-sm">{dayName}</div>
+                              <div className="text-gray-400 dark:text-[#64748B] text-[10px] font-semibold uppercase tracking-wider mt-0.5">{d.txCount} {t('txns')}</div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-gray-900 dark:text-white font-bold text-lg tracking-tight">{formatShort(d.value)}</div>
+                              {i < portfolioHistory.length - 1 && (
+                                <div className={`text-[11px] font-bold ${up ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>{up ? '▲' : '▼'} {formatShort(Math.abs(d.change))}</div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="grid grid-cols-2 gap-2">
+                            <div className="bg-white dark:bg-[#0B0D14] rounded-xl p-2.5 border border-gray-100 dark:border-[#ffffff05]">
+                              <div className="text-gray-400 dark:text-[#64748B] text-[9px] font-bold uppercase tracking-wider mb-1">{t('workingProfit')}</div>
+                              <div className={`font-bold text-sm ${wpUp ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>{wpUp && d.workingProfit > 0 ? '+' : ''}{formatShort(d.workingProfit)}</div>
+                            </div>
+                            <div className="bg-white dark:bg-[#0B0D14] rounded-xl p-2.5 border border-gray-100 dark:border-[#ffffff05]">
+                              <div className="text-gray-400 dark:text-[#64748B] text-[9px] font-bold uppercase tracking-wider mb-1">{t('unrealizedPnL')}</div>
+                              <div className={`font-bold text-sm ${unUp ? 'text-blue-600 dark:text-[#3B82F6]' : 'text-orange-500 dark:text-[#F59E0B]'}`}>{unUp && d.unrealizedPnL > 0 ? '+' : ''}{formatShort(d.unrealizedPnL)}</div>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
 
