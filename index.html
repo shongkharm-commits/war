@@ -88,7 +88,7 @@
             suggestedRates: "Suggested Rates", margin: "MARGIN", recentList: "Recent Transactions", receive: "Receive",
             send: "Send", today: "TODAY", week: "WEEK", month: "MONTH", custom: "CUSTOM", smartLog: "Smart Log",
             workingProfit: "Working Profit", weBuy: "We Buy", weSell: "We Sell",
-            portfolioValue: "Portfolio Value", dailyHistory: "Daily Portfolio History", tapForHistory: "Tap chart for daily history", last7days: "Last 7 days", dayChange: "Day Change", noDataYet: "No data yet",
+            portfolioValue: "Portfolio Value", dailyHistory: "Daily Portfolio History", tapForHistory: "Tap chart for daily history", last7days: "Last 7 days", dayChange: "Day Change", noDataYet: "No data yet", todayLabel: "Today", pnl: "PnL",
             noAutoDetect: "Couldn't auto-detect the rate. Please enter details:", fcyAmount: "FCY Amount",
             currency: "Currency", rate: "Rate", amount: "Amount", whichDirection: "Which direction is this exchange?",
             detectedRate: "DETECTED RATE", configTitle: "Configuration", configDesc: "Set your daily market rates, margin, and balances.",
@@ -114,7 +114,7 @@
             suggestedRates: "ອັດຕາແນະນຳ", margin: "ກຳໄລ", recentList: "ລາຍການຫຼ້າສຸດ", receive: "ຮັບເຂົ້າ",
             send: "ຈ່າຍອອກ", today: "ມື້ນີ້", week: "ອາທິດ", month: "ເດືອນ", custom: "ເລືອກມື້", smartLog: "ບັນທຶກອັດສະລິຍະ",
             workingProfit: "ກຳໄລ", weBuy: "ຮັບຊື້", weSell: "ຂາຍ",
-            portfolioValue: "ມູນຄ່າລວມ", dailyHistory: "ປະຫວັດມູນຄ່າລວມ ປະຈຳວັນ", tapForHistory: "ແຕະກຣາຟເພື່ອເບິ່ງປະຫວັດ", last7days: "7 ວັນຜ່ານມາ", dayChange: "ປ່ຽນແປງ", noDataYet: "ຍັງບໍ່ມີຂໍ້ມູນ",
+            portfolioValue: "ມູນຄ່າລວມ", dailyHistory: "ປະຫວັດມູນຄ່າລວມ ປະຈຳວັນ", tapForHistory: "ແຕະກຣາຟເພື່ອເບິ່ງປະຫວັດ", last7days: "7 ວັນຜ່ານມາ", dayChange: "ປ່ຽນແປງ", noDataYet: "ຍັງບໍ່ມີຂໍ້ມູນ", todayLabel: "ມື້ນີ້", pnl: "PnL",
             noAutoDetect: "ບໍ່ສາມາດກວດຫາອັດຕາແລກປ່ຽນ. ກະລຸນາປ້ອນຂໍ້ມູນ:", fcyAmount: "ຈຳນວນເງິນຕ່າງປະເທດ",
             currency: "ສະກຸນເງິນ", rate: "ເລດ", amount: "ຈຳນວນ", whichDirection: "ທິດທາງການແລກປ່ຽນຄືແນວໃດ?",
             detectedRate: "ເລດທີ່ກວດພົບ", configTitle: "ການຕັ້ງຄ່າ", configDesc: "ຕັ້ງຄ່າອັດຕາຕະຫຼາດ, ກຳໄລ ແລະ ຍອດເງິນ.",
@@ -1702,6 +1702,7 @@
 
                     {(() => {
                       const last7 = portfolioHistory.slice(-7);
+                      const today = last7.length ? last7[last7.length - 1] : { workingProfit: 0, change: 0, txCount: 0 };
                       const currentValue = last7.length ? last7[last7.length - 1].value : 0;
                       const weekAgoValue = last7.length ? last7[0].value : 0;
                       const weekChange = currentValue - weekAgoValue;
@@ -1729,8 +1730,23 @@
                                 {formatDisplay(currentValue, true)} <span className="text-base sm:text-lg font-medium opacity-50">LAK</span>
                               </div>
                             </div>
-                            <div className={`text-xs sm:text-sm font-bold mb-6 flex items-center gap-1.5 ${isUp ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>
+                            <div className={`text-xs sm:text-sm font-bold mb-4 flex items-center gap-1.5 ${isUp ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>
                               {isUp ? '▲' : '▼'} {formatShort(Math.abs(weekChange))} LAK ({isUp ? '+' : '-'}{Math.abs(weekPct).toFixed(1)}%) <span className="text-gray-400 dark:text-[#64748B] font-semibold">· {t('last7days')}</span>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-2 mb-5">
+                              <div className="bg-white/60 dark:bg-[#ffffff0a] rounded-2xl p-2.5 border border-gray-100/60 dark:border-[#ffffff08]">
+                                <div className="text-gray-400 dark:text-[#64748B] text-[9px] font-bold uppercase tracking-wider mb-1">{t('todayLabel')} {t('workingProfit')}</div>
+                                <div className={`font-bold text-sm tracking-tight ${today.workingProfit >= 0 ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>{today.workingProfit > 0 ? '+' : ''}{formatShort(today.workingProfit)}</div>
+                              </div>
+                              <div className="bg-white/60 dark:bg-[#ffffff0a] rounded-2xl p-2.5 border border-gray-100/60 dark:border-[#ffffff08]">
+                                <div className="text-gray-400 dark:text-[#64748B] text-[9px] font-bold uppercase tracking-wider mb-1">{t('todayLabel')} {t('pnl')}</div>
+                                <div className={`font-bold text-sm tracking-tight ${today.change >= 0 ? 'text-blue-600 dark:text-[#3B82F6]' : 'text-orange-500 dark:text-[#F59E0B]'}`}>{today.change > 0 ? '+' : ''}{formatShort(today.change)}</div>
+                              </div>
+                              <div className="bg-white/60 dark:bg-[#ffffff0a] rounded-2xl p-2.5 border border-gray-100/60 dark:border-[#ffffff08]">
+                                <div className="text-gray-400 dark:text-[#64748B] text-[9px] font-bold uppercase tracking-wider mb-1">{t('todayLabel')} {t('txns')}</div>
+                                <div className="font-bold text-sm tracking-tight text-gray-900 dark:text-white">{today.txCount}</div>
+                              </div>
                             </div>
 
                             <div className="w-full h-[130px] relative">
@@ -2496,7 +2512,7 @@
                   <div className="p-5 pt-10 shrink-0 border-b border-gray-100 dark:border-[#ffffff0a] flex justify-between items-center">
                     <div>
                       <h3 className="text-gray-900 dark:text-white text-xl font-bold">{t('dailyHistory')}</h3>
-                      <p className="text-gray-500 dark:text-[#8F9BB3] text-xs font-medium m-0 mt-0.5">{t('portfolioValue')} · {t('workingProfit')} · {t('unrealizedPnL')}</p>
+                      <p className="text-gray-500 dark:text-[#8F9BB3] text-xs font-medium m-0 mt-0.5">{t('portfolioValue')} · {t('workingProfit')} · {t('pnl')}</p>
                     </div>
                     <button onClick={() => setShowPortfolioModal(false)} className="text-gray-500 dark:text-[#8F9BB3] bg-gray-100 dark:bg-[#1A202C] rounded-full p-2 active:scale-90 transition-transform"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg></button>
                   </div>
@@ -2507,29 +2523,29 @@
                       const dayName = dateObj.toLocaleDateString(lang === 'LA' ? 'lo-LA' : 'en-US', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
                       const up = d.change >= 0;
                       const wpUp = d.workingProfit >= 0;
-                      const unUp = d.unrealizedPnL >= 0;
                       return (
                         <div key={d.ts} className="bg-gray-50 dark:bg-[#131722] rounded-2xl border border-gray-100 dark:border-[#ffffff05] p-4">
                           <div className="flex justify-between items-start mb-3">
                             <div>
                               <div className="text-gray-900 dark:text-white font-bold text-sm">{dayName}</div>
-                              <div className="text-gray-400 dark:text-[#64748B] text-[10px] font-semibold uppercase tracking-wider mt-0.5">{d.txCount} {t('txns')}</div>
                             </div>
                             <div className="text-right">
+                              <div className="text-gray-400 dark:text-[#64748B] text-[9px] font-bold uppercase tracking-wider">{t('portfolioValue')}</div>
                               <div className="text-gray-900 dark:text-white font-bold text-lg tracking-tight">{formatShort(d.value)}</div>
-                              {i < portfolioHistory.length - 1 && (
-                                <div className={`text-[11px] font-bold ${up ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>{up ? '▲' : '▼'} {formatShort(Math.abs(d.change))}</div>
-                              )}
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
+                          <div className="grid grid-cols-3 gap-2">
                             <div className="bg-white dark:bg-[#0B0D14] rounded-xl p-2.5 border border-gray-100 dark:border-[#ffffff05]">
                               <div className="text-gray-400 dark:text-[#64748B] text-[9px] font-bold uppercase tracking-wider mb-1">{t('workingProfit')}</div>
                               <div className={`font-bold text-sm ${wpUp ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>{wpUp && d.workingProfit > 0 ? '+' : ''}{formatShort(d.workingProfit)}</div>
                             </div>
                             <div className="bg-white dark:bg-[#0B0D14] rounded-xl p-2.5 border border-gray-100 dark:border-[#ffffff05]">
-                              <div className="text-gray-400 dark:text-[#64748B] text-[9px] font-bold uppercase tracking-wider mb-1">{t('unrealizedPnL')}</div>
-                              <div className={`font-bold text-sm ${unUp ? 'text-blue-600 dark:text-[#3B82F6]' : 'text-orange-500 dark:text-[#F59E0B]'}`}>{unUp && d.unrealizedPnL > 0 ? '+' : ''}{formatShort(d.unrealizedPnL)}</div>
+                              <div className="text-gray-400 dark:text-[#64748B] text-[9px] font-bold uppercase tracking-wider mb-1">{t('pnl')}</div>
+                              <div className={`font-bold text-sm ${up ? 'text-blue-600 dark:text-[#3B82F6]' : 'text-orange-500 dark:text-[#F59E0B]'}`}>{i < portfolioHistory.length - 1 ? `${d.change > 0 ? '+' : ''}${formatShort(d.change)}` : '—'}</div>
+                            </div>
+                            <div className="bg-white dark:bg-[#0B0D14] rounded-xl p-2.5 border border-gray-100 dark:border-[#ffffff05]">
+                              <div className="text-gray-400 dark:text-[#64748B] text-[9px] font-bold uppercase tracking-wider mb-1">{t('txns')}</div>
+                              <div className="font-bold text-sm text-gray-900 dark:text-white">{d.txCount}</div>
                             </div>
                           </div>
                         </div>
