@@ -1776,24 +1776,23 @@
                           </button>
                         </div>
                       </h3>
-                      <div className="grid grid-cols-2 gap-3">
-                        {poolOrder.map((cur, idx) => {
+                      <div className="bg-gray-50 dark:bg-[#131722] rounded-2xl border border-gray-100 dark:border-[#ffffff05] overflow-hidden">
+                        {poolOrder.map((cur, idx, arr) => {
                           const bal = dashboardStats.balances[cur] || 0;
                           const isLow = bal < liquidityThresholds[cur];
                           return (
-                            <div key={cur} className={`relative overflow-hidden bg-gray-50 dark:bg-[#131722] p-4 rounded-2xl border ${isLow ? 'border-red-400 dark:border-[#EF4444]/50 shadow-[0_0_15px_rgba(239,68,68,0.1)] dark:shadow-[0_0_15px_rgba(239,68,68,0.15)]' : 'border-gray-100 dark:border-[#ffffff05]'}`}>
-                              <div className={`transition-opacity duration-200 ${isReorderingPools ? 'opacity-40' : 'opacity-100'}`}>
-                                <div className="flex justify-between items-center mb-2">
-                                  <span className="text-gray-500 dark:text-[#8F9BB3] text-xs font-bold tracking-wider">{cur}</span>
-                                  {isLow && <span className="w-2 h-2 rounded-full bg-red-500 dark:bg-[#EF4444] animate-pulse"></span>}
-                                </div>
-                                <div className={`text-xl font-bold tracking-tight truncate ${isLow ? 'text-red-600 dark:text-[#EF4444]' : 'text-gray-900 dark:text-white'}`}>{formatDisplay(bal, true)}</div>
+                            <div key={cur} className={`flex items-center justify-between px-4 py-3 ${idx !== arr.length - 1 ? 'border-b border-gray-100 dark:border-[#ffffff05]' : ''} ${isLow ? 'bg-red-50/60 dark:bg-[#EF4444]/5' : ''}`}>
+                              <div className="flex items-center gap-2 w-[35%]">
+                                {isLow && <span className="w-1.5 h-1.5 rounded-full bg-red-500 dark:bg-[#EF4444] animate-pulse shrink-0"></span>}
+                                <span className={`text-sm font-bold tracking-wider ${isLow ? 'text-red-600 dark:text-[#EF4444]' : 'text-gray-500 dark:text-[#8F9BB3]'}`}>{cur}</span>
                               </div>
-                              {isReorderingPools && (
-                                <div className="absolute inset-0 flex items-center justify-center gap-3 bg-transparent z-10">
-                                  <button onClick={() => movePool(idx, -1)} disabled={idx === 0} className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-[#1A202C] shadow-md border border-gray-200 dark:border-[#ffffff10] text-gray-700 dark:text-gray-200 disabled:opacity-30 active:scale-90 transition-all"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
-                                  <button onClick={() => movePool(idx, 1)} disabled={idx === poolOrder.length - 1} className="w-10 h-10 flex items-center justify-center rounded-full bg-white dark:bg-[#1A202C] shadow-md border border-gray-200 dark:border-[#ffffff10] text-gray-700 dark:text-gray-200 disabled:opacity-30 active:scale-90 transition-all"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+                              {isReorderingPools ? (
+                                <div className="flex items-center gap-1.5">
+                                  <button onClick={() => movePool(idx, -1)} disabled={idx === 0} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white dark:bg-[#1A202C] border border-gray-200 dark:border-[#ffffff10] text-gray-700 dark:text-gray-200 disabled:opacity-30 active:scale-90 transition-all"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="18 15 12 9 6 15"></polyline></svg></button>
+                                  <button onClick={() => movePool(idx, 1)} disabled={idx === arr.length - 1} className="w-8 h-8 flex items-center justify-center rounded-lg bg-white dark:bg-[#1A202C] border border-gray-200 dark:border-[#ffffff10] text-gray-700 dark:text-gray-200 disabled:opacity-30 active:scale-90 transition-all"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
                                 </div>
+                              ) : (
+                                <span className={`text-base font-bold tracking-tight truncate text-right ${isLow ? 'text-red-600 dark:text-[#EF4444]' : 'text-gray-900 dark:text-white'}`}>{formatDisplay(bal, true)}</span>
                               )}
                             </div>
                           );
