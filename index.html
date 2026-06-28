@@ -1452,53 +1452,34 @@
             rangeStart = Math.min(rangeStart, startOfToday - 6 * DAY);
 
             let bal = { LAK: Number(openingBalances.LAK) || 0, USD: Number(openingBalances.USD) || 0, USDT: Number(openingBalances.USDT) || 0, THB: Number(openingBalances.THB) || 0, CNY: Number(openingBalances.CNY) || 0 };
-            let fifo = { USD: { lakBuy: [], lakSell: [], thbBuy: [], thbSell: [] }, USDT: { lakBuy: [], lakSell: [], thbBuy: [], thbSell: [] }, THB: { lakBuy: [], lakSell: [] }, CNY: { lakBuy: [], lakSell: [], thbBuy: [], thbSell: [] } };
 
-            const processTx = (tx) => {
-              let wpLAK = 0, wpTHB = 0;
+            const lakVal = (amt, cur, ts) => (amt || 0) * (cur === 'LAK' ? 1 : getRate(cur, ts));
+
+            // Working profit = the spread earned on each trade: the LAK value of what was
+            // received minus the LAK value of what was given, priced at that day's market
+            // rates. This is order-independent and correctly shows profit on a buy-low/
+            // sell-high round trip (transfers and capital adjustments are not trades).
+            const processTx = (tx, ts) => {
               if (tx.receiveCur && bal[tx.receiveCur] !== undefined) bal[tx.receiveCur] += tx.receiveAmt;
               if (tx.sendCur && bal[tx.sendCur] !== undefined) bal[tx.sendCur] -= tx.sendAmt;
-              if (tx.isTransfer || tx.isAdjustment) return { wpLAK, wpTHB };
-              ['USD', 'USDT', 'THB', 'CNY'].forEach(cur => {
-                if (tx.sendCur === 'LAK' && tx.receiveCur === cur) {
-                  let rate = tx.sendAmt / tx.receiveAmt, remaining = tx.receiveAmt;
-                  while (remaining > 0 && fifo[cur].lakSell.length > 0) { let s = fifo[cur].lakSell[0], m = Math.min(remaining, s.amt); wpLAK += m * (s.rate - rate); s.amt -= m; remaining -= m; if (s.amt === 0) fifo[cur].lakSell.shift(); }
-                  if (remaining > 0) fifo[cur].lakBuy.push({ amt: remaining, rate });
-                } else if (tx.receiveCur === 'LAK' && tx.sendCur === cur) {
-                  let rate = tx.receiveAmt / tx.sendAmt, remaining = tx.sendAmt;
-                  while (remaining > 0 && fifo[cur].lakBuy.length > 0) { let b = fifo[cur].lakBuy[0], m = Math.min(remaining, b.amt); wpLAK += m * (rate - b.rate); b.amt -= m; remaining -= m; if (b.amt === 0) fifo[cur].lakBuy.shift(); }
-                  if (remaining > 0) fifo[cur].lakSell.push({ amt: remaining, rate });
-                }
-                if (cur !== 'THB') {
-                  if (tx.sendCur === 'THB' && tx.receiveCur === cur) {
-                    let rate = tx.sendAmt / tx.receiveAmt, remaining = tx.receiveAmt;
-                    while (remaining > 0 && fifo[cur].thbSell.length > 0) { let s = fifo[cur].thbSell[0], m = Math.min(remaining, s.amt); wpTHB += m * (s.rate - rate); s.amt -= m; remaining -= m; if (s.amt === 0) fifo[cur].thbSell.shift(); }
-                    if (remaining > 0) fifo[cur].thbBuy.push({ amt: remaining, rate });
-                  } else if (tx.receiveCur === 'THB' && tx.sendCur === cur) {
-                    let rate = tx.receiveAmt / tx.sendAmt, remaining = tx.sendAmt;
-                    while (remaining > 0 && fifo[cur].thbBuy.length > 0) { let b = fifo[cur].thbBuy[0], m = Math.min(remaining, b.amt); wpTHB += m * (rate - b.rate); b.amt -= m; remaining -= m; if (b.amt === 0) fifo[cur].thbBuy.shift(); }
-                    if (remaining > 0) fifo[cur].thbSell.push({ amt: remaining, rate });
-                  }
-                }
-              });
-              return { wpLAK, wpTHB };
+              if (tx.isTransfer || tx.isAdjustment) return 0;
+              return lakVal(tx.receiveAmt, tx.receiveCur, ts) - lakVal(tx.sendAmt, tx.sendCur, ts);
             };
 
             const valueOf = (b, ts) => (b.LAK || 0) + ['USD', 'USDT', 'THB', 'CNY'].reduce((s, c) => s + (b[c] || 0) * getRate(c, ts), 0);
 
-            // Replay transactions before the range to set up balances + FIFO inventory.
+            // Replay transactions before the range to set up the running balance.
             let txIdx = 0;
-            while (txIdx < sortedTx.length && new Date(sortedTx[txIdx].date).getTime() < rangeStart) { processTx(sortedTx[txIdx]); txIdx++; }
+            while (txIdx < sortedTx.length && new Date(sortedTx[txIdx].date).getTime() < rangeStart) { processTx(sortedTx[txIdx], new Date(sortedTx[txIdx].date).getTime()); txIdx++; }
 
             const days = [];
             let prevValue = null;
             for (let dayStart = rangeStart; dayStart <= startOfToday; dayStart += DAY) {
               const dayEnd = dayStart + DAY - 1;
               const balBeforeDay = { ...bal };
-              let wpLAK = 0, wpTHB = 0, txCount = 0;
+              let workingProfit = 0, txCount = 0;
               while (txIdx < sortedTx.length && new Date(sortedTx[txIdx].date).getTime() <= dayEnd) {
-                const r = processTx(sortedTx[txIdx]);
-                wpLAK += r.wpLAK; wpTHB += r.wpTHB;
+                workingProfit += processTx(sortedTx[txIdx], new Date(sortedTx[txIdx].date).getTime());
                 if (!sortedTx[txIdx].isAdjustment) txCount++;
                 txIdx++;
               }
@@ -1507,7 +1488,6 @@
               if (prevValue !== null) {
                 ['USD', 'USDT', 'THB', 'CNY'].forEach(c => { unreal += (balBeforeDay[c] || 0) * (getRate(c, dayEnd) - getRate(c, dayStart - 1)); });
               }
-              const workingProfit = wpLAK + wpTHB * (marketRates.THB || 0);
               days.push({ ts: dayStart, value, change: prevValue === null ? 0 : value - prevValue, workingProfit, unrealizedPnL: unreal, txCount });
               prevValue = value;
             }
