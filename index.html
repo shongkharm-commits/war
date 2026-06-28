@@ -1080,7 +1080,6 @@
             const eodRates = { USD: getHistoricalConfigRate('USD', endOfDay), USDT: getHistoricalConfigRate('USDT', endOfDay), THB: getHistoricalConfigRate('THB', endOfDay), CNY: getHistoricalConfigRate('CNY', endOfDay) };
             const bodRates = { USD: getHistoricalConfigRate('USD', startOfDay - 1), USDT: getHistoricalConfigRate('USDT', startOfDay - 1), THB: getHistoricalConfigRate('THB', startOfDay - 1), CNY: getHistoricalConfigRate('CNY', startOfDay - 1) };
 
-            let fifoQueues = { USD: { lakBuy: [], lakSell: [], thbBuy: [], thbSell: [] }, USDT: { lakBuy: [], lakSell: [], thbBuy: [], thbSell: [] }, THB: { lakBuy: [], lakSell: [] }, CNY: { lakBuy: [], lakSell: [], thbBuy: [], thbSell: [] } };
             let dayWPLAK = 0; let dayWPTHB = 0;
 
             let bodBal = { LAK: Number(openingBalances.LAK)||0, USD: Number(openingBalances.USD)||0, USDT: Number(openingBalances.USDT)||0, THB: Number(openingBalances.THB)||0, CNY: Number(openingBalances.CNY)||0 };
@@ -1113,54 +1112,12 @@
                         else dayWPLAK -= tx.sendAmt * (tx.sendCur === 'LAK' ? 1 : eodRates[tx.sendCur] || 0);
                     }
                 }
-                // Exchange Working Profit (FIFO)
-                else if (!tx.isTransfer && !tx.isAdjustment) {
-                    let txWPLAK = 0; let txWPTHB = 0;
-                    ['USD', 'USDT', 'THB', 'CNY'].forEach(cur => {
-                      if (tx.sendCur === 'LAK' && tx.receiveCur === cur) {
-                        let rate = tx.sendAmt / tx.receiveAmt; let remaining = tx.receiveAmt;
-                        while (remaining > 0 && fifoQueues[cur].lakSell.length > 0) {
-                            let sell = fifoQueues[cur].lakSell[0]; let matchAmt = Math.min(remaining, sell.amt);
-                            txWPLAK += matchAmt * (sell.rate - rate);
-                            sell.amt -= matchAmt; remaining -= matchAmt;
-                            if (sell.amt === 0) fifoQueues[cur].lakSell.shift();
-                        }
-                        if (remaining > 0) fifoQueues[cur].lakBuy.push({ amt: remaining, rate: rate });
-                      }
-                      else if (tx.receiveCur === 'LAK' && tx.sendCur === cur) {
-                        let rate = tx.receiveAmt / tx.sendAmt; let remaining = tx.sendAmt;
-                        while (remaining > 0 && fifoQueues[cur].lakBuy.length > 0) {
-                            let buy = fifoQueues[cur].lakBuy[0]; let matchAmt = Math.min(remaining, buy.amt);
-                            txWPLAK += matchAmt * (rate - buy.rate);
-                            buy.amt -= matchAmt; remaining -= matchAmt;
-                            if (buy.amt === 0) fifoQueues[cur].lakBuy.shift();
-                        }
-                        if (remaining > 0) fifoQueues[cur].lakSell.push({ amt: remaining, rate: rate });
-                      }
-                      if (cur !== 'THB') {
-                        if (tx.sendCur === 'THB' && tx.receiveCur === cur) {
-                          let rate = tx.sendAmt / tx.receiveAmt; let remaining = tx.receiveAmt;
-                          while (remaining > 0 && fifoQueues[cur].thbSell.length > 0) {
-                              let sell = fifoQueues[cur].thbSell[0]; let matchAmt = Math.min(remaining, sell.amt);
-                              txWPTHB += matchAmt * (sell.rate - rate);
-                              sell.amt -= matchAmt; remaining -= matchAmt;
-                              if (sell.amt === 0) fifoQueues[cur].thbSell.shift();
-                          }
-                          if (remaining > 0) fifoQueues[cur].thbBuy.push({ amt: remaining, rate: rate });
-                        }
-                        else if (tx.receiveCur === 'THB' && tx.sendCur === cur) {
-                          let rate = tx.receiveAmt / tx.sendAmt; let remaining = tx.sendAmt;
-                          while (remaining > 0 && fifoQueues[cur].thbBuy.length > 0) {
-                              let buy = fifoQueues[cur].thbBuy[0]; let matchAmt = Math.min(remaining, buy.amt);
-                              txWPTHB += matchAmt * (rate - buy.rate);
-                              buy.amt -= matchAmt; remaining -= matchAmt;
-                              if (buy.amt === 0) fifoQueues[cur].thbBuy.shift();
-                          }
-                          if (remaining > 0) fifoQueues[cur].thbSell.push({ amt: remaining, rate: rate });
-                        }
-                      }
-                    });
-                    if (isTargetDay) { dayWPLAK += txWPLAK; dayWPTHB += txWPTHB; }
+                // Exchange Working Profit = spread earned on the trade: LAK value received
+                // minus LAK value given, priced at market rates (order-independent).
+                else if (!tx.isTransfer && !tx.isAdjustment && isTargetDay) {
+                    const recVal = tx.receiveCur === 'LAK' ? (tx.receiveAmt || 0) : (tx.receiveAmt || 0) * (eodRates[tx.receiveCur] || 0);
+                    const sendVal = tx.sendCur === 'LAK' ? (tx.sendAmt || 0) : (tx.sendAmt || 0) * (eodRates[tx.sendCur] || 0);
+                    dayWPLAK += recVal - sendVal;
                 }
             });
 
