@@ -8,6 +8,8 @@
 #
 # Usage:  bash build.sh
 set -e
+
+# 1) Compile the app (JSX -> app.js)
 npx --yes esbuild@0.24.0 src/app.jsx \
   --outfile=app.js \
   --bundle \
@@ -16,3 +18,16 @@ npx --yes esbuild@0.24.0 src/app.jsx \
   --target=es2019 \
   --external:https://*
 echo "Built app.js"
+
+# 2) Compile Tailwind CSS (only the classes actually used -> styles.css)
+cat > /tmp/sf_tw.config.js <<CFG
+module.exports = {
+  darkMode: 'class',
+  content: ['./index.html','./src/app.jsx'],
+  theme: { extend: {} },
+  plugins: [],
+};
+CFG
+printf '@tailwind base;\n@tailwind components;\n@tailwind utilities;\n' > /tmp/sf_tw.input.css
+npx --yes tailwindcss@3.4.17 -c /tmp/sf_tw.config.js -i /tmp/sf_tw.input.css -o styles.css --minify
+echo "Built styles.css"

@@ -2,9 +2,10 @@
 
 A money-exchange tracker web app (calculator + profit tracker + live market rates) for a currency exchange business. Languages: English & Lao.
 
-The app code lives in **`src/app.jsx`**. It is pre-compiled to **`app.js`** so the browser
-does not have to compile anything on startup (this makes the app open in about a second
-instead of several). `index.html` loads `app.js` plus React and Tailwind from CDNs.
+The app code lives in **`src/app.jsx`**. It is pre-compiled to **`app.js`**, and the
+styling is pre-compiled to **`styles.css`**, so the browser does not have to compile
+anything on startup (this makes the app open in about a second instead of several).
+`index.html` loads `app.js` and `styles.css`, plus React from a CDN.
 
 ### Editing the app
 
