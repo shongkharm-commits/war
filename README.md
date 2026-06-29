@@ -2,7 +2,19 @@
 
 A money-exchange tracker web app (calculator + profit tracker + live market rates) for a currency exchange business. Languages: English & Lao.
 
-The entire app is a single file: **`index.html`**. There is no build step — it runs directly in the browser using React + Tailwind loaded from CDNs.
+The app code lives in **`src/app.jsx`**. It is pre-compiled to **`app.js`**, and the
+styling is pre-compiled to **`styles.css`**, so the browser does not have to compile
+anything on startup (this makes the app open in about a second instead of several).
+`index.html` loads `app.js` and `styles.css`, plus React from a CDN.
+
+### Editing the app
+
+1. Edit **`src/app.jsx`** (this is the source of truth — do not edit `app.js` by hand).
+2. Run **`bash build.sh`** to regenerate `app.js`.
+3. Commit both `src/app.jsx` and `app.js`.
+
+Cloudflare just serves the files as-is (no build step on its side), so committing the
+compiled `app.js` is what updates the live site.
 
 ## How to update the live website (smart-finex.com)
 

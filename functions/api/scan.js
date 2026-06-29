@@ -24,15 +24,36 @@ export async function onRequestPost(context) {
       );
     }
 
-    const prompt = `You are a data extraction assistant for a money exchange business. Analyze this chat screenshot and extract the currency exchange transaction details. The supported currencies are USD, USDT, THB, CNY (foreign currencies) and LAK, THB (local settlement currencies). Return ONLY a single valid JSON object, with no extra text, in this exact shape:
-{
-  "unitAmt": "<the foreign currency amount being exchanged, digits only, no commas>",
-  "rate": "<the exchange rate, digits only, no commas>",
-  "resAmt": "<the resulting total amount, digits only, no commas>",
-  "unitCur": "<one of USD, USDT, THB, CNY>",
-  "resCur": "<one of LAK, THB>"
-}
-If any value cannot be determined from the image, use an empty string "" for that field. Do not guess wildly. Do not include explanations, markdown, or code fences — output the raw JSON object only.`;
+    const prompt = `You are a data extraction assistant for a Lao money exchange business. The image may be a bank exchange history (e.g. BCEL, LDB) or a chat screenshot showing one or more currency exchange transactions.
+
+IMPORTANT — TRUE RATE CALCULATION:
+Each bank transaction typically shows:
+- The foreign currency amount (USD, THB, CNY, USDT)
+- A listed rate (e.g. 22,692 K/$)
+- A BASE exchange amount in LAK (labeled "ແລກ" or similar)
+- A FEE in LAK (labeled "ຄ່າທຳຄູນ", "ຖາທຳຄູນ", or "ຄ່າທຳນຽມ" — this is added cost the customer pays)
+
+For each transaction you MUST:
+1. Find unitAmt = the foreign currency amount
+2. Find resAmt = BASE exchange amount + FEE (total LAK the customer actually pays/receives)
+3. Calculate the TRUE rate = resAmt / unitAmt (round to 2 decimal places)
+   — Do NOT use the listed rate; always compute rate from the actual totals.
+
+Return ONLY a valid JSON array (even if there is only one transaction), no extra text, in this exact shape:
+[
+  {
+    "unitAmt": "<foreign currency amount, digits only, no commas>",
+    "rate": "<TRUE computed rate = resAmt / unitAmt, 2 decimal places>",
+    "resAmt": "<total LAK = base exchange + fee, digits only, no commas>",
+    "unitCur": "<one of USD, USDT, THB, CNY>",
+    "resCur": "<LAK or THB>"
+  }
+]
+
+Rules:
+- If no fee is visible, resAmt = base exchange amount and rate = listed rate.
+- If a value cannot be determined, use "" for that field.
+- Do not guess. Do not include markdown, code fences, or explanations — output the raw JSON array only.`;
 
     const payload = {
       model: "google/gemini-2.5-flash",
@@ -64,7 +85,7 @@ If any value cannot be determined from the image, use an empty string "" for tha
       return json({ error: { message: data?.error?.message || `OpenRouter Error ${res.status}` } }, res.status);
     }
 
-    const responseText = data?.choices?.[0]?.message?.content || "{}";
+    const responseText = data?.choices?.[0]?.message?.content || "[]";
     return json({ responseText }, 200);
   } catch (err) {
     return json({ error: { message: err?.message || "Scan failed." } }, 500);
