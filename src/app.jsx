@@ -1031,7 +1031,9 @@
             const eodRates = { USD: getHistoricalConfigRate('USD', endOfDay), USDT: getHistoricalConfigRate('USDT', endOfDay), THB: getHistoricalConfigRate('THB', endOfDay), CNY: getHistoricalConfigRate('CNY', endOfDay) };
             const bodRates = { USD: getHistoricalConfigRate('USD', startOfDay - 1), USDT: getHistoricalConfigRate('USDT', startOfDay - 1), THB: getHistoricalConfigRate('THB', startOfDay - 1), CNY: getHistoricalConfigRate('CNY', startOfDay - 1) };
 
-            let dayWPLAK = 0; let dayWPTHB = 0;
+            let dayWP = 0;
+            const invS = { USD: [], USDT: [], THB: [], CNY: [] };
+            const lakValS = (amt, cur) => (amt || 0) * (cur === 'LAK' ? 1 : (eodRates[cur] || 0));
 
             let bodBal = { LAK: Number(openingBalances.LAK)||0, USD: Number(openingBalances.USD)||0, USDT: Number(openingBalances.USDT)||0, THB: Number(openingBalances.THB)||0, CNY: Number(openingBalances.CNY)||0 };
             let eodBal = { ...bodBal };
@@ -1052,27 +1054,29 @@
                 const isTargetDay = txTime >= startOfDay && txTime <= endOfDay;
                 if (isTargetDay) dayTxList.push(tx);
 
-                // Transfer Working Profit (Intra-currency profits)
-                if (tx.isTransfer && isTargetDay) {
-                    if (tx.receiveCur !== 'SYS') {
-                        if (tx.receiveCur === 'THB') dayWPTHB += tx.receiveAmt;
-                        else dayWPLAK += tx.receiveAmt * (tx.receiveCur === 'LAK' ? 1 : eodRates[tx.receiveCur] || 0);
+                // Realized working profit: buying records cost; selling realizes
+                // proceeds minus FIFO cost. Shortfall is costed at market. Inventory is
+                // built from every trade in order; only target-day sales count toward today.
+                if (!tx.isTransfer && !tx.isAdjustment) {
+                    const proceeds = lakValS(tx.receiveAmt, tx.receiveCur);
+                    const paid = lakValS(tx.sendAmt, tx.sendCur);
+                    if (invS[tx.sendCur]) {
+                        let remaining = tx.sendAmt || 0, cost = 0;
+                        while (remaining > 1e-9 && invS[tx.sendCur].length > 0) {
+                            const lot = invS[tx.sendCur][0]; const m = Math.min(remaining, lot.amt);
+                            cost += m * lot.cpu; lot.amt -= m; remaining -= m;
+                            if (lot.amt <= 1e-9) invS[tx.sendCur].shift();
+                        }
+                        if (remaining > 1e-9) cost += remaining * (eodRates[tx.sendCur] || 0);
+                        if (isTargetDay) dayWP += proceeds - cost;
                     }
-                    if (tx.sendCur !== 'SYS') {
-                        if (tx.sendCur === 'THB') dayWPTHB -= tx.sendAmt;
-                        else dayWPLAK -= tx.sendAmt * (tx.sendCur === 'LAK' ? 1 : eodRates[tx.sendCur] || 0);
+                    if (invS[tx.receiveCur] && (tx.receiveAmt || 0) > 0) {
+                        invS[tx.receiveCur].push({ amt: tx.receiveAmt, cpu: paid / tx.receiveAmt });
                     }
-                }
-                // Exchange Working Profit = spread earned on the trade: LAK value received
-                // minus LAK value given, priced at market rates (order-independent).
-                else if (!tx.isTransfer && !tx.isAdjustment && isTargetDay) {
-                    const recVal = tx.receiveCur === 'LAK' ? (tx.receiveAmt || 0) : (tx.receiveAmt || 0) * (eodRates[tx.receiveCur] || 0);
-                    const sendVal = tx.sendCur === 'LAK' ? (tx.sendAmt || 0) : (tx.sendAmt || 0) * (eodRates[tx.sendCur] || 0);
-                    dayWPLAK += recVal - sendVal;
                 }
             });
 
-            const totalDayWP = dayWPLAK + (dayWPTHB * (eodRates.THB || 0));
+            const totalDayWP = dayWP;
             const eodTotalLAK = (eodBal.LAK||0) + (eodBal.USD||0)*(eodRates.USD||0) + (eodBal.USDT||0)*(eodRates.USDT||0) + (eodBal.THB||0)*(eodRates.THB||0) + (eodBal.CNY||0)*(eodRates.CNY||0);
             const bodTotalLAK = (bodBal.LAK||0) + (bodBal.USD||0)*(bodRates.USD||0) + (bodBal.USDT||0)*(bodRates.USDT||0) + (bodBal.THB||0)*(bodRates.THB||0) + (bodBal.CNY||0)*(bodRates.CNY||0);
             const dailyCashGrowth = eodTotalLAK - bodTotalLAK;
@@ -1363,15 +1367,35 @@
 
             const lakVal = (amt, cur, ts) => (amt || 0) * (cur === 'LAK' ? 1 : getRate(cur, ts));
 
-            // Working profit = the spread earned on each trade: the LAK value of what was
-            // received minus the LAK value of what was given, priced at that day's market
-            // rates. This is order-independent and correctly shows profit on a buy-low/
-            // sell-high round trip (transfers and capital adjustments are not trades).
+            // Working profit = REALIZED trading profit. Buying a foreign currency only
+            // records its cost (no profit yet); profit is realized when that currency is
+            // sold/disposed: proceeds (in LAK) minus the FIFO cost of what was sold. If a
+            // sale exceeds tracked inventory, the shortfall is costed at the market rate.
+            // Transfers and capital adjustments are not trades.
+            const inv = { USD: [], USDT: [], THB: [], CNY: [] };
             const processTx = (tx, ts) => {
               if (tx.receiveCur && bal[tx.receiveCur] !== undefined) bal[tx.receiveCur] += tx.receiveAmt;
               if (tx.sendCur && bal[tx.sendCur] !== undefined) bal[tx.sendCur] -= tx.sendAmt;
               if (tx.isTransfer || tx.isAdjustment) return 0;
-              return lakVal(tx.receiveAmt, tx.receiveCur, ts) - lakVal(tx.sendAmt, tx.sendCur, ts);
+              let profit = 0;
+              const proceedsLAK = lakVal(tx.receiveAmt, tx.receiveCur, ts); // value of what we got
+              const paidLAK = lakVal(tx.sendAmt, tx.sendCur, ts);           // value of what we gave
+              // Disposing the sent foreign currency realizes profit vs its FIFO cost
+              if (inv[tx.sendCur]) {
+                let remaining = tx.sendAmt || 0, cost = 0;
+                while (remaining > 1e-9 && inv[tx.sendCur].length > 0) {
+                  const lot = inv[tx.sendCur][0]; const m = Math.min(remaining, lot.amt);
+                  cost += m * lot.cpu; lot.amt -= m; remaining -= m;
+                  if (lot.amt <= 1e-9) inv[tx.sendCur].shift();
+                }
+                if (remaining > 1e-9) cost += remaining * getRate(tx.sendCur, ts);
+                profit += proceedsLAK - cost;
+              }
+              // Acquiring the received foreign currency just records its LAK cost basis
+              if (inv[tx.receiveCur] && (tx.receiveAmt || 0) > 0) {
+                inv[tx.receiveCur].push({ amt: tx.receiveAmt, cpu: paidLAK / tx.receiveAmt });
+              }
+              return profit;
             };
 
             const valueOf = (b, ts) => (b.LAK || 0) + ['USD', 'USDT', 'THB', 'CNY'].reduce((s, c) => s + (b[c] || 0) * getRate(c, ts), 0);
