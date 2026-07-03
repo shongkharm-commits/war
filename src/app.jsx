@@ -379,9 +379,11 @@
           // --- MARKET & ALERT STATES ---
           const [livePrices, setLivePrices] = useState({ DXY: 104.50, USDTHB: 32.38, CNYTHB: 4.52, USDCNY: 7.23, USDVND: 25400 });
           const [priceDirections, setPriceDirections] = useState({ DXY: 'up', USDTHB: 'down', CNYTHB: 'up', USDCNY: 'up', USDVND: 'up' });
-          const [alerts, setAlerts] = useState([]);
+          const [alerts, setAlerts] = useState(() => { try { return JSON.parse(localStorage.getItem('sf_alerts')) || []; } catch (e) { return []; } });
           const [showAlertModal, setShowAlertModal] = useState(false);
           const [newAlert, setNewAlert] = useState({ asset: 'USDTHB', condition: 'above', price: '' });
+          const [lastRateUpdate, setLastRateUpdate] = useState(null);
+          useEffect(() => { localStorage.setItem('sf_alerts', JSON.stringify(alerts)); }, [alerts]);
           const [selectedChart, setSelectedChart] = useState(null);
           const prevPricesRef = useRef(livePrices);
 
@@ -401,23 +403,36 @@
                 }
               } catch (err) {}
 
+              let gotLive = false;
               const fetchYF = async (symbol, key) => {
-                try {
-                  const url = encodeURIComponent(`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}`);
-                  const res = await fetch(`https://api.allorigins.win/raw?url=${url}`);
-                  if (res.ok) {
-                      const data = await res.json();
-                      if (data.chart?.result?.[0]?.meta?.regularMarketPrice) {
-                          updatedPrices[key] = data.chart.result[0].meta.regularMarketPrice;
-                      }
-                  }
-                } catch (e) {}
+                // Cache-buster (ts=...) makes each proxied URL unique, so the CORS proxy
+                // cannot serve us a stale cached copy — this is what kept rates frozen.
+                const yfUrl = `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?interval=1m&range=1d&ts=${Date.now()}`;
+                const proxies = [
+                  `https://api.allorigins.win/raw?url=${encodeURIComponent(yfUrl)}`,
+                  `https://corsproxy.io/?url=${encodeURIComponent(yfUrl)}`
+                ];
+                for (const proxied of proxies) {
+                  try {
+                    const res = await fetch(proxied);
+                    if (res.ok) {
+                        const data = await res.json();
+                        const meta = data.chart?.result?.[0]?.meta;
+                        if (meta?.regularMarketPrice) {
+                            updatedPrices[key] = meta.regularMarketPrice;
+                            gotLive = true;
+                            return;
+                        }
+                    }
+                  } catch (e) {}
+                }
               };
 
               await Promise.all([
                 fetchYF('DX-Y.NYB', 'DXY'), fetchYF('THB=X', 'USDTHB'), fetchYF('CNYTHB=X', 'CNYTHB'),
                 fetchYF('CNY=X', 'USDCNY'), fetchYF('VND=X', 'USDVND')
               ]);
+              if (gotLive) setLastRateUpdate(Date.now());
 
               Object.keys(updatedPrices).forEach(key => {
                 if (updatedPrices[key] > prevPricesRef.current[key]) dirs[key] = 'up';
@@ -438,11 +453,19 @@
             alerts.forEach(alertItem => {
               if (!alertItem.active) return;
               const currentPrice = livePrices[alertItem.asset];
-              const triggered = alertItem.condition === 'above' ? currentPrice >= alertItem.price : currentPrice <= alertItem.price;
-              if (triggered) {
+              if (!currentPrice) return;
+              const condMet = alertItem.condition === 'above' ? currentPrice >= alertItem.price : currentPrice <= alertItem.price;
+              // Crossing semantics: an alert created while its condition is ALREADY true
+              // stays un-armed until the price moves to the other side of the target.
+              // It only fires on an actual crossing — never immediately on creation.
+              if (alertItem.armed === false) {
+                if (!condMet) setAlerts(prev => prev.map(a => a.id === alertItem.id ? { ...a, armed: true } : a));
+                return;
+              }
+              if (condMet) {
                 if (window.Notification && Notification.permission === 'granted') {
                   new Notification(`🚨 LFX Alert: ${alertItem.asset}`, {
-                    body: `${alertItem.asset} crossed target ${formatDisplay(alertItem.price)}!`,
+                    body: `${alertItem.asset} crossed target ${formatDisplay(alertItem.price)}! Now ${formatDisplay(currentPrice)}`,
                     icon: 'https://upload.wikimedia.org/wikipedia/commons/thumb/c/c2/Black_icon_-_financial_investment.svg/512px-Black_icon_-_financial_investment.svg.png'
                   });
                 } else if (window.navigator?.vibrate) window.navigator.vibrate([200, 100, 200, 100, 500]);
@@ -460,7 +483,11 @@
 
           const handleSaveAlert = () => {
             if (!newAlert.price) return;
-            setAlerts(prev => [{ ...newAlert, id: Date.now(), active: true, price: parseFloat(newAlert.price) }, ...prev]);
+            const target = parseFloat(newAlert.price);
+            const cur = livePrices[newAlert.asset];
+            // Arm only if the condition is not already true — otherwise wait for a crossing.
+            const armed = cur ? !(newAlert.condition === 'above' ? cur >= target : cur <= target) : true;
+            setAlerts(prev => [{ ...newAlert, id: Date.now(), active: true, price: target, armed }, ...prev]);
             setShowAlertModal(false);
             setNewAlert({ ...newAlert, price: '' });
           };
@@ -1825,8 +1852,10 @@
                       <div>
                         <h2 className="text-gray-900 dark:text-white text-2xl font-bold tracking-tight">{t('markets')}</h2>
                         <div className="flex items-center gap-1.5 mt-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse"></span>
-                          <span className="text-gray-500 dark:text-[#8F9BB3] text-[10px] font-bold uppercase tracking-wider">{t('update15s')}</span>
+                          <span className={`w-1.5 h-1.5 rounded-full ${lastRateUpdate && Date.now() - lastRateUpdate < 60000 ? 'bg-green-500 animate-pulse' : 'bg-orange-400'}`}></span>
+                          <span className="text-gray-500 dark:text-[#8F9BB3] text-[10px] font-bold uppercase tracking-wider">
+                            {lastRateUpdate ? `${t('update15s')} · ${new Date(lastRateUpdate).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit',second:'2-digit'})}` : t('update15s')}
+                          </span>
                         </div>
                       </div>
                       <button onClick={handleOpenAlertModal} className="text-blue-600 bg-blue-50 dark:text-[#3B82F6] dark:bg-[#3B82F6]/10 px-4 py-2 rounded-xl flex items-center gap-2 text-sm font-bold active:scale-95 transition-all shadow-sm">
