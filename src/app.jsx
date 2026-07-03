@@ -379,8 +379,10 @@
           }, [transactions, logDateFilter]);
 
           // --- MARKET & ALERT STATES ---
-          const [livePrices, setLivePrices] = useState({ DXY: 104.50, USDTHB: 32.38, CNYTHB: 4.52, USDCNY: 7.23, USDVND: 25400 });
-          const [priceDirections, setPriceDirections] = useState({ DXY: 'up', USDTHB: 'down', CNYTHB: 'up', USDCNY: 'up', USDVND: 'up' });
+          // Start from the last REAL prices we saw (saved locally) — never from
+          // hardcoded numbers. Unknown prices stay empty and show a loading dash.
+          const [livePrices, setLivePrices] = useState(() => { try { return JSON.parse(localStorage.getItem('sf_livePrices')) || {}; } catch (e) { return {}; } });
+          const [priceDirections, setPriceDirections] = useState({});
           const [alerts, setAlerts] = useState(() => { try { return JSON.parse(localStorage.getItem('sf_alerts')) || []; } catch (e) { return []; } });
           const [showAlertModal, setShowAlertModal] = useState(false);
           const [newAlert, setNewAlert] = useState({ asset: 'USDTHB', condition: 'above', price: '' });
@@ -441,16 +443,20 @@
               let updatedPrices = { ...prevPricesRef.current };
               let dirs = { ...priceDirections };
 
-              try {
-                const fiatRes = await fetch('https://open.er-api.com/v6/latest/USD');
-                if (fiatRes.ok) {
-                  const fiatData = await fiatRes.json();
-                  if (!updatedPrices.USDTHB || updatedPrices.USDTHB === prevPricesRef.current.USDTHB) updatedPrices.USDTHB = fiatData.rates.THB;
-                  if (!updatedPrices.USDCNY || updatedPrices.USDCNY === prevPricesRef.current.USDCNY) updatedPrices.USDCNY = fiatData.rates.CNY;
-                  if (!updatedPrices.USDVND || updatedPrices.USDVND === prevPricesRef.current.USDVND) updatedPrices.USDVND = fiatData.rates.VND;
-                  if (!updatedPrices.CNYTHB || updatedPrices.CNYTHB === prevPricesRef.current.CNYTHB) updatedPrices.CNYTHB = fiatData.rates.THB / fiatData.rates.CNY;
-                }
-              } catch (err) {}
+              // The daily fiat API is only a first-load fallback for keys we have
+              // never seen — it must NOT overwrite live data (it can be a day old).
+              if (!updatedPrices.USDTHB || !updatedPrices.USDCNY || !updatedPrices.USDVND || !updatedPrices.CNYTHB) {
+                try {
+                  const fiatRes = await fetch('https://open.er-api.com/v6/latest/USD');
+                  if (fiatRes.ok) {
+                    const fiatData = await fiatRes.json();
+                    if (!updatedPrices.USDTHB) updatedPrices.USDTHB = fiatData.rates.THB;
+                    if (!updatedPrices.USDCNY) updatedPrices.USDCNY = fiatData.rates.CNY;
+                    if (!updatedPrices.USDVND) updatedPrices.USDVND = fiatData.rates.VND;
+                    if (!updatedPrices.CNYTHB) updatedPrices.CNYTHB = fiatData.rates.THB / fiatData.rates.CNY;
+                  }
+                } catch (err) {}
+              }
 
               let gotLive = false;
               const fetchYF = async (symbol, key) => {
@@ -491,6 +497,7 @@
               prevPricesRef.current = updatedPrices;
               setLivePrices(updatedPrices);
               setPriceDirections(dirs);
+              try { localStorage.setItem('sf_livePrices', JSON.stringify(updatedPrices)); } catch (e) {}
             };
 
             fetchRealRates();
@@ -499,6 +506,9 @@
           }, []);
 
           useEffect(() => {
+            // Never evaluate alerts against restored/stale prices: require at least
+            // one successful LIVE fetch in this session before any alert can act.
+            if (!lastRateUpdate) return;
             alerts.forEach(alertItem => {
               if (!alertItem.active) return;
               const currentPrice = livePrices[alertItem.asset];
@@ -521,7 +531,7 @@
                 setAlerts(prev => prev.map(a => a.id === alertItem.id ? { ...a, active: false } : a));
               }
             });
-          }, [livePrices, alerts]);
+          }, [livePrices, alerts, lastRateUpdate]);
 
           const handleOpenAlertModal = () => {
             if (window.Notification && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
@@ -1925,7 +1935,7 @@
                         const dir = priceDirections[asset.id];
                         return (
                           <div key={asset.id} onClick={() => setSelectedChart(asset)} className="flex items-center justify-between bg-white dark:bg-[#131722] p-4 rounded-[20px] border border-gray-200 dark:border-[#ffffff0a] shadow-[0_2px_10px_rgba(0,0,0,0.02)] dark:shadow-none relative overflow-hidden transition-all active:scale-[0.97] cursor-pointer group">
-                            <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none transition-colors duration-500 opacity-40 dark:opacity-20 ${dir === 'up' ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                            <div className={`absolute top-0 right-0 w-32 h-32 rounded-full blur-3xl -mr-10 -mt-10 pointer-events-none transition-colors duration-500 opacity-40 dark:opacity-20 ${!dir ? 'bg-gray-300' : dir === 'up' ? 'bg-green-500' : 'bg-red-500'}`}></div>
                             <div className="flex items-center gap-4 relative z-10">
                               <div className="w-11 h-11 rounded-full bg-gray-50 dark:bg-[#1A202C] flex items-center justify-center font-bold text-gray-700 dark:text-[#8F9BB3] border border-gray-100 dark:border-[#ffffff05] shadow-sm group-hover:scale-105 transition-transform text-lg">{asset.symbol}</div>
                               <div className="flex flex-col">
@@ -1934,11 +1944,11 @@
                               </div>
                             </div>
                             <div className="flex flex-col items-end relative z-10">
-                              <div className={`text-lg font-bold tracking-tight transition-colors duration-300 ${dir === 'up' ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>
-                                {price ? price.toLocaleString('en-US', { minimumFractionDigits: asset.decimals, maximumFractionDigits: asset.decimals }) : "0"}
+                              <div className={`text-lg font-bold tracking-tight transition-colors duration-300 ${!dir ? 'text-gray-500 dark:text-[#8F9BB3]' : dir === 'up' ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>
+                                {price ? price.toLocaleString('en-US', { minimumFractionDigits: asset.decimals, maximumFractionDigits: asset.decimals }) : "—"}
                               </div>
-                              <div className={`flex items-center gap-1 text-[10px] font-bold transition-colors ${dir === 'up' ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>
-                                {dir === 'up' ? '▲' : '▼'} {t('live15s')}
+                              <div className={`flex items-center gap-1 text-[10px] font-bold transition-colors ${!dir ? 'text-gray-400 dark:text-[#64748B]' : dir === 'up' ? 'text-green-600 dark:text-[#10B981]' : 'text-red-600 dark:text-[#EF4444]'}`}>
+                                {!dir ? '•' : dir === 'up' ? '▲' : '▼'} {t('live15s')}
                               </div>
                             </div>
                           </div>
