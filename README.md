@@ -63,6 +63,40 @@ without this key — only the photo-scanning feature needs it.
 On the OpenRouter key page you can set a credit limit per key. Setting a small cap means
 that even in a worst case, spending is bounded.
 
+## Background price alerts (push even when the app is closed)
+
+The Markets tab can send real push notifications with the app closed. It works like this:
+the device registers a push subscription (`sw.js` service worker), the subscription plus
+the alert list is stored server-side (`/api/alerts` → Cloudflare KV), a cron job calls
+`/api/check` every few minutes which fetches live rates and pushes to any device whose
+alert crossed its target (`/api/pending` supplies the message text).
+
+### One-time setup in Cloudflare
+
+1. **KV storage**: Dashboard → **Storage & Databases → KV** → Create namespace, name it
+   `smartfinex-alerts`. Then in your Pages project → **Settings → Bindings** →
+   Add → **KV namespace** → Variable name **`ALERTS`**, select the namespace. Save.
+2. **Private push key**: Pages project → **Settings → Environment variables** → add
+   **`VAPID_JWK`** (Secret) with the private key JSON (generated once; ask the person
+   who set this up — it is intentionally NOT committed to this repo).
+3. **Re-deploy** the project so the bindings take effect.
+4. **Cron**: Dashboard → **Workers & Pages → Create → Worker** (name it
+   `smartfinex-cron`), replace its code with:
+
+   ```js
+   export default {
+     async scheduled(event, env, ctx) {
+       ctx.waitUntil(fetch('https://smart-finex.com/api/check'));
+     }
+   }
+   ```
+
+   Deploy, then in the Worker's **Settings → Trigger Events → Cron Triggers** add
+   `*/5 * * * *` (every 5 minutes).
+
+On the phone: add the app to the Home Screen (required on iPhone), open it, go to
+Markets → Set Alert → **Background Alerts → Enable**, and allow notifications.
+
 ## Notes
 
 - The app also talks to **Firebase** (Google sign-in + cloud sync). Those settings live in the

@@ -50,6 +50,7 @@
             contact: "Contact Us", rateApp: "Rate the App", report: "Report an Issue", txns: "TXNs", pair: "Pair",
             pasteData: "Parse Data", language: "Language", theme: "Theme", light: "Light", dark: "Dark", system: "System",
             markets: "Markets", globalAssets: "Global Assets", setAlert: "Set Alert", priceAlerts: "Price Alerts", asset: "Asset", condition: "Condition", targetPrice: "Target Price", above: "Above", below: "Below", saveAlert: "Save Alert", active: "Active", triggered: "Triggered",
+            bgAlerts: "Background Alerts", bgAlertsOn: "On — alerts work even when the app is closed", bgAlertsOff: "Get alerts even when the app is closed", bgAlertsEnable: "Enable", bgAlertsUnsupported: "Add this app to your Home Screen first, then enable here", bgAlertsDenied: "Notifications are blocked — allow them in Settings",
             swapRateAmt: "Swap Rate/Amt",
             requestReport: "Request / Report", feedbackDesc: "Help us improve! Request a feature or report a bug.", feedbackType: "Type", featureReq: "Feature Request", bugReport: "Bug Report", generalAdvice: "General Advice", feedbackPlaceholder: "Tell us what's on your mind...", submit: "Submit Feedback",
             viewAll: "View All", txLog: "Transaction Log", filterDate: "Filter by Date", clear: "Clear", update15s: "Updates every 15s", live15s: "Live (15s)",
@@ -76,6 +77,7 @@
             contact: "ຕິດຕໍ່ພວກເຮົາ", rateApp: "ໃຫ້ຄະແນນແອັບ", report: "ລາຍງານບັນຫາ", txns: "ລາຍການ", pair: "ຄູ່ເງິນ",
             pasteData: "ວິເຄາະຂໍ້ມູນ", language: "ປ່ຽນພາສາ", theme: "ຮູບແບບ", light: "ແຈ້ງ", dark: "ມືດ", system: "ລະບົບ",
             markets: "ຕະຫຼາດ", globalAssets: "ຊັບສິນທົ່ວໂລກ", setAlert: "ຕັ້ງແຈ້ງເຕືອນ", priceAlerts: "ແຈ້ງເຕືອນລາຄາ", asset: "ຊັບສິນ", condition: "ເງື່ອນໄຂ", targetPrice: "ລາຄາເປົ້າໝາຍ", above: "ສູງກວ່າ", below: "ຕ່ຳກວ່າ", saveAlert: "ບັນທຶກ", active: "ເຮັດວຽກຢູ່", triggered: "ແຈ້ງເຕືອນແລ້ວ",
+            bgAlerts: "ແຈ້ງເຕືອນພື້ນຫຼັງ", bgAlertsOn: "ເປີດແລ້ວ — ແຈ້ງເຕືອນເຖິງແມ່ນປິດແອັບ", bgAlertsOff: "ຮັບແຈ້ງເຕືອນເຖິງແມ່ນປິດແອັບ", bgAlertsEnable: "ເປີດໃຊ້", bgAlertsUnsupported: "ກະລຸນາເພີ່ມແອັບໃສ່ໜ້າຈໍຫຼັກກ່ອນ ແລ້ວກົດເປີດໃຊ້ບ່ອນນີ້", bgAlertsDenied: "ການແຈ້ງເຕືອນຖືກບລັອກ — ອະນຸຍາດໃນ Settings",
             swapRateAmt: "ສະຫຼັບເລດ/ຈຳນວນ",
             requestReport: "ສະເໜີແນະ / ລາຍງານ", feedbackDesc: "ຊ່ວຍພວກເຮົາປັບປຸງ! ຂໍຄຸນສົມບັດໃໝ່ ຫຼື ລາຍງານບັນຫາ.", feedbackType: "ປະເພດ", featureReq: "ຂໍຄຸນສົມບັດໃໝ່", bugReport: "ລາຍງານບັນຫາ", generalAdvice: "ຄຳແນະນຳທົ່ວໄປ", feedbackPlaceholder: "ພິມຂໍ້ຄວາມຂອງທ່ານທີ່ນີ້...", submit: "ສົ່ງຄຳຕິຊົມ",
             viewAll: "ເບິ່ງທັງໝົດ", txLog: "ບັນທຶກທຸລະກຳ (Log)", filterDate: "ເລືອກວັນທີ", clear: "ລຶບ", update15s: "ອັບເດດທຸກໆ 15 ວິນາທີ", live15s: "ສົດ (15ວິ)",
@@ -384,6 +386,53 @@
           const [newAlert, setNewAlert] = useState({ asset: 'USDTHB', condition: 'above', price: '' });
           const [lastRateUpdate, setLastRateUpdate] = useState(null);
           useEffect(() => { localStorage.setItem('sf_alerts', JSON.stringify(alerts)); }, [alerts]);
+
+          // --- Background push alerts (works even when the app is closed) ---
+          const VAPID_PUBLIC_KEY = 'BKffzv2ooeFsQuqmpXlswuao0CEh1_ynY6myaUGcWDHEFA4es17y5tEqbAXaGIVuzsS4BNFNQvVqJr8CzZX6CPA';
+          const [pushStatus, setPushStatus] = useState('off'); // off | enabled | unsupported | denied
+
+          const urlB64ToUint8 = (s) => {
+            const pad = '='.repeat((4 - s.length % 4) % 4);
+            const b64 = (s + pad).replace(/-/g, '+').replace(/_/g, '/');
+            const raw = window.atob(b64);
+            return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+          };
+
+          useEffect(() => {
+            if (!('serviceWorker' in navigator)) { setPushStatus('unsupported'); return; }
+            navigator.serviceWorker.register('sw.js').then(async (reg) => {
+              if (!('PushManager' in window)) { setPushStatus('unsupported'); return; }
+              try {
+                const sub = await reg.pushManager.getSubscription();
+                if (sub) setPushStatus('enabled');
+              } catch (e) {}
+            }).catch(() => setPushStatus('unsupported'));
+          }, []);
+
+          const syncAlertsToServer = async (alertList) => {
+            try {
+              if (!('serviceWorker' in navigator)) return;
+              const reg = await navigator.serviceWorker.getRegistration();
+              if (!reg || !reg.pushManager) return;
+              const sub = await reg.pushManager.getSubscription();
+              if (!sub) return;
+              await fetch('/api/alerts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub.toJSON(), alerts: alertList }) });
+            } catch (e) {}
+          };
+          useEffect(() => { syncAlertsToServer(alerts); }, [alerts]);
+
+          const enableBackgroundAlerts = async () => {
+            try {
+              if (!('serviceWorker' in navigator) || !('PushManager' in window) || !window.Notification) { setPushStatus('unsupported'); return; }
+              const perm = await Notification.requestPermission();
+              if (perm !== 'granted') { setPushStatus('denied'); return; }
+              const reg = await navigator.serviceWorker.ready;
+              let sub = await reg.pushManager.getSubscription();
+              if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlB64ToUint8(VAPID_PUBLIC_KEY) });
+              await fetch('/api/alerts', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ subscription: sub.toJSON(), alerts }) });
+              setPushStatus('enabled');
+            } catch (e) { setPushStatus('unsupported'); }
+          };
           const [selectedChart, setSelectedChart] = useState(null);
           const prevPricesRef = useRef(livePrices);
 
@@ -2677,6 +2726,21 @@
                         <input type="number" value={newAlert.price} onChange={e => setNewAlert({...newAlert, price: e.target.value})} className="w-full bg-gray-50 dark:bg-[#0B0D14] text-gray-900 dark:text-white p-4 rounded-xl border border-gray-200 dark:border-[#ffffff10] outline-none font-semibold text-lg transition-colors focus:border-blue-500 dark:focus:border-[#3B82F6]" placeholder={`e.g. ${formatDisplay(livePrices[newAlert.asset])}`} />
                       </div>
                       <button onClick={handleSaveAlert} className="w-full mt-2 bg-blue-600 dark:bg-[#3B82F6] hover:bg-blue-700 dark:hover:bg-[#2563EB] text-white py-4 rounded-2xl font-bold shadow-[0_4px_15px_rgba(59,130,246,0.3)] transition-colors">{t('saveAlert')}</button>
+
+                      <div className="mt-4 flex items-center justify-between bg-gray-50 dark:bg-[#1A202C] p-4 rounded-2xl border border-gray-100 dark:border-[#ffffff0a]">
+                        <div className="flex-1 pr-3">
+                          <div className="text-gray-900 dark:text-white text-sm font-bold flex items-center gap-2">
+                            {t('bgAlerts')}
+                            {pushStatus === 'enabled' && <span className="w-2 h-2 rounded-full bg-green-500"></span>}
+                          </div>
+                          <div className="text-gray-500 dark:text-[#8F9BB3] text-[11px] font-medium mt-0.5">
+                            {pushStatus === 'enabled' ? t('bgAlertsOn') : pushStatus === 'denied' ? t('bgAlertsDenied') : pushStatus === 'unsupported' ? t('bgAlertsUnsupported') : t('bgAlertsOff')}
+                          </div>
+                        </div>
+                        {pushStatus !== 'enabled' && pushStatus !== 'denied' && (
+                          <button onClick={enableBackgroundAlerts} className="shrink-0 bg-green-600 dark:bg-[#10B981] text-white px-4 py-2.5 rounded-xl text-sm font-bold active:scale-95 transition-all shadow-sm">{t('bgAlertsEnable')}</button>
+                        )}
+                      </div>
                     </div>
                   </div>
                 </div>
