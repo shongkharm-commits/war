@@ -1121,6 +1121,27 @@
             const invS = { USD: [], USDT: [], THB: [], CNY: [] };
             const lakValS = (amt, cur) => (amt || 0) * (cur === 'LAK' ? 1 : (eodRates[cur] || 0));
 
+            // Same lot ledger the dashboard keeps, so the statement reports the same number.
+            // It starts from the opening balances, priced at the rate when the history begins.
+            const seedTs = (sortedTx.length ? new Date(sortedTx[0].date).getTime() : startOfDay) - 1;
+            ['USD', 'USDT', 'THB', 'CNY'].forEach(cur => {
+                const amt = Number(openingBalances[cur]) || 0;
+                const rate = getHistoricalConfigRate(cur, seedTs);
+                if (amt > 0 && rate > 0) invS[cur].push({ amt, cpu: rate });
+            });
+            // Newest lots first - what is sold is costed against what was most recently bought.
+            const invTakeS = (cur, amt) => {
+                let remaining = amt || 0, cost = 0;
+                while (remaining > 1e-9 && invS[cur].length > 0) {
+                    const lot = invS[cur][invS[cur].length - 1]; const m = Math.min(remaining, lot.amt);
+                    cost += m * lot.cpu; lot.amt -= m; remaining -= m;
+                    if (lot.amt <= 1e-9) invS[cur].pop();
+                }
+                if (remaining > 1e-9) cost += remaining * (eodRates[cur] || 0);
+                return cost;
+            };
+            const invAddS = (cur, amt, cpu) => { if (invS[cur] && (amt || 0) > 0) invS[cur].push({ amt, cpu }); };
+
             let bodBal = { LAK: Number(openingBalances.LAK)||0, USD: Number(openingBalances.USD)||0, USDT: Number(openingBalances.USDT)||0, THB: Number(openingBalances.THB)||0, CNY: Number(openingBalances.CNY)||0 };
             let eodBal = { ...bodBal };
             let dayTxList = [];
@@ -1140,25 +1161,21 @@
                 const isTargetDay = txTime >= startOfDay && txTime <= endOfDay;
                 if (isTargetDay) dayTxList.push(tx);
 
-                // Realized working profit: buying records cost; selling realizes
-                // proceeds minus FIFO cost. Shortfall is costed at market. Inventory is
-                // built from every trade in order; only target-day sales count toward today.
-                if (!tx.isTransfer && !tx.isAdjustment) {
+                // Realized working profit: buying records cost; selling realizes proceeds
+                // minus what was paid for the currency sold. Shortfall is costed at market.
+                // Inventory is built from every trade in order; only target-day sales count.
+                if (tx.isTransfer || tx.isAdjustment) {
+                    // Not trades, but they still move stock, so the ledger has to follow.
+                    if (invS[tx.sendCur]) invTakeS(tx.sendCur, tx.sendAmt);
+                    invAddS(tx.receiveCur, tx.receiveAmt, getHistoricalConfigRate(tx.receiveCur, txTime));
+                } else {
                     const proceeds = lakValS(tx.receiveAmt, tx.receiveCur);
                     const paid = lakValS(tx.sendAmt, tx.sendCur);
                     if (invS[tx.sendCur]) {
-                        let remaining = tx.sendAmt || 0, cost = 0;
-                        while (remaining > 1e-9 && invS[tx.sendCur].length > 0) {
-                            const lot = invS[tx.sendCur][0]; const m = Math.min(remaining, lot.amt);
-                            cost += m * lot.cpu; lot.amt -= m; remaining -= m;
-                            if (lot.amt <= 1e-9) invS[tx.sendCur].shift();
-                        }
-                        if (remaining > 1e-9) cost += remaining * (eodRates[tx.sendCur] || 0);
+                        const cost = invTakeS(tx.sendCur, tx.sendAmt);
                         if (isTargetDay) dayWP += proceeds - cost;
                     }
-                    if (invS[tx.receiveCur] && (tx.receiveAmt || 0) > 0) {
-                        invS[tx.receiveCur].push({ amt: tx.receiveAmt, cpu: paid / tx.receiveAmt });
-                    }
+                    if ((tx.receiveAmt || 0) > 0) invAddS(tx.receiveCur, tx.receiveAmt, paid / tx.receiveAmt);
                 }
             });
 
@@ -1455,8 +1472,8 @@
 
             // Working profit = REALIZED trading profit. Buying a foreign currency only
             // records its cost (no profit yet); profit is realized when that currency is
-            // sold/disposed: proceeds (in LAK) minus the FIFO cost of what was sold. If a
-            // sale exceeds tracked inventory, the shortfall is costed at the market rate.
+            // sold/disposed: proceeds (in LAK) minus what the currency sold cost to buy. If
+            // a sale exceeds tracked inventory, the shortfall is costed at the market rate.
             // Transfers and capital adjustments are not trades.
             const inv = { USD: [], USDT: [], THB: [], CNY: [] };
 
@@ -1464,21 +1481,26 @@
             // stock already on hand, so without a cost basis for them the ledger begins
             // empty while `bal` does not, and every sale is then costed against whatever
             // happens to be sitting in the ledger instead of the stock it came from.
-            const invSeedTs = Math.min(rangeStart, firstDay);
+            // Priced just before the first transaction - that is when the opening stock was
+            // on hand. (Not rangeStart, which gets pushed back to keep the chart 7 days wide.)
+            const invSeedTs = (sortedTx.length ? new Date(sortedTx[0].date).getTime() : startOfToday) - 1;
             ['USD', 'USDT', 'THB', 'CNY'].forEach(cur => {
               const amt = Number(openingBalances[cur]) || 0;
               const rate = getRate(cur, invSeedTs);
               if (amt > 0 && rate > 0) inv[cur].push({ amt, cpu: rate });
             });
 
-            // Take `amt` units out of a currency's lots, oldest first, and report what they
-            // cost. Anything beyond what the ledger knows about is costed at market.
+            // Take `amt` units out of a currency's lots and report what they cost. Newest
+            // lots go first: what gets sold is costed against what was most recently bought,
+            // so today's profit is today's selling minus today's buying. Stock held from
+            // before is left alone until a sale runs past what was bought recently, and only
+            // then does its cost come into it. Anything beyond the ledger is costed at market.
             const invTake = (cur, amt, ts) => {
               let remaining = amt || 0, cost = 0;
               while (remaining > 1e-9 && inv[cur].length > 0) {
-                const lot = inv[cur][0]; const m = Math.min(remaining, lot.amt);
+                const lot = inv[cur][inv[cur].length - 1]; const m = Math.min(remaining, lot.amt);
                 cost += m * lot.cpu; lot.amt -= m; remaining -= m;
-                if (lot.amt <= 1e-9) inv[cur].shift();
+                if (lot.amt <= 1e-9) inv[cur].pop();
               }
               if (remaining > 1e-9) cost += remaining * getRate(cur, ts);
               return cost;
