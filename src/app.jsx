@@ -1459,28 +1459,53 @@
             // sale exceeds tracked inventory, the shortfall is costed at the market rate.
             // Transfers and capital adjustments are not trades.
             const inv = { USD: [], USDT: [], THB: [], CNY: [] };
+
+            // The lot ledger has to start where the balances start. Opening balances are
+            // stock already on hand, so without a cost basis for them the ledger begins
+            // empty while `bal` does not, and every sale is then costed against whatever
+            // happens to be sitting in the ledger instead of the stock it came from.
+            const invSeedTs = Math.min(rangeStart, firstDay);
+            ['USD', 'USDT', 'THB', 'CNY'].forEach(cur => {
+              const amt = Number(openingBalances[cur]) || 0;
+              const rate = getRate(cur, invSeedTs);
+              if (amt > 0 && rate > 0) inv[cur].push({ amt, cpu: rate });
+            });
+
+            // Take `amt` units out of a currency's lots, oldest first, and report what they
+            // cost. Anything beyond what the ledger knows about is costed at market.
+            const invTake = (cur, amt, ts) => {
+              let remaining = amt || 0, cost = 0;
+              while (remaining > 1e-9 && inv[cur].length > 0) {
+                const lot = inv[cur][0]; const m = Math.min(remaining, lot.amt);
+                cost += m * lot.cpu; lot.amt -= m; remaining -= m;
+                if (lot.amt <= 1e-9) inv[cur].shift();
+              }
+              if (remaining > 1e-9) cost += remaining * getRate(cur, ts);
+              return cost;
+            };
+            const invAdd = (cur, amt, cpu) => { if (inv[cur] && (amt || 0) > 0) inv[cur].push({ amt, cpu }); };
+
             const processTx = (tx, ts) => {
               if (tx.receiveCur && bal[tx.receiveCur] !== undefined) bal[tx.receiveCur] += tx.receiveAmt;
               if (tx.sendCur && bal[tx.sendCur] !== undefined) bal[tx.sendCur] -= tx.sendAmt;
-              if (tx.isTransfer || tx.isAdjustment) return 0;
+
+              // Transfers and capital adjustments earn nothing, but they do move stock in
+              // and out. Skipping the ledger for them leaves it holding currency the
+              // business no longer has, and a later sale gets costed against those stale
+              // lots rather than what was actually bought.
+              if (tx.isTransfer || tx.isAdjustment) {
+                if (inv[tx.sendCur]) invTake(tx.sendCur, tx.sendAmt, ts);
+                invAdd(tx.receiveCur, tx.receiveAmt, getRate(tx.receiveCur, ts));
+                return 0;
+              }
+
               let profit = 0;
               const proceedsLAK = lakVal(tx.receiveAmt, tx.receiveCur, ts); // value of what we got
               const paidLAK = lakVal(tx.sendAmt, tx.sendCur, ts);           // value of what we gave
               // Disposing the sent foreign currency realizes profit vs its FIFO cost
-              if (inv[tx.sendCur]) {
-                let remaining = tx.sendAmt || 0, cost = 0;
-                while (remaining > 1e-9 && inv[tx.sendCur].length > 0) {
-                  const lot = inv[tx.sendCur][0]; const m = Math.min(remaining, lot.amt);
-                  cost += m * lot.cpu; lot.amt -= m; remaining -= m;
-                  if (lot.amt <= 1e-9) inv[tx.sendCur].shift();
-                }
-                if (remaining > 1e-9) cost += remaining * getRate(tx.sendCur, ts);
-                profit += proceedsLAK - cost;
-              }
+              if (inv[tx.sendCur]) profit += proceedsLAK - invTake(tx.sendCur, tx.sendAmt, ts);
               // Acquiring the received foreign currency just records its LAK cost basis
-              if (inv[tx.receiveCur] && (tx.receiveAmt || 0) > 0) {
-                inv[tx.receiveCur].push({ amt: tx.receiveAmt, cpu: paidLAK / tx.receiveAmt });
-              }
+              if ((tx.receiveAmt || 0) > 0) invAdd(tx.receiveCur, tx.receiveAmt, paidLAK / tx.receiveAmt);
               return profit;
             };
 
