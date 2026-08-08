@@ -31,3 +31,16 @@ CFG
 printf '@tailwind base;\n@tailwind components;\n@tailwind utilities;\n' > /tmp/sf_tw.input.css
 npx --yes tailwindcss@3.4.17 -c /tmp/sf_tw.config.js -i /tmp/sf_tw.input.css -o styles.css --minify
 echo "Built styles.css"
+
+# 3) Stamp app.js and styles.css in index.html with the version shown in the app's
+#    options menu. The filenames never change, so without this a browser that has
+#    already downloaded app.js keeps running the old build no matter how many times
+#    the app is reopened - a new deployment simply never reaches it.
+VERSION=$(sed -n 's/.*>V \([0-9][0-9.]*\)<.*/\1/p' src/app.jsx | head -1)
+if [ -z "$VERSION" ]; then
+  echo "WARNING: no 'V <version>' found in src/app.jsx - asset URLs not stamped" >&2
+else
+  sed -E -e "s#(\"(app\.js|styles\.css))(\?v=[^\"]*)?\"#\1?v=${VERSION}\"#g" index.html > index.html.tmp
+  mv index.html.tmp index.html
+  echo "Stamped app.js and styles.css with v${VERSION}"
+fi
