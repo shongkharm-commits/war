@@ -2532,7 +2532,7 @@
                     </div>
 
                     <div className="text-center mt-2">
-                      <span className="text-gray-400 dark:text-[#64748B] text-[10px] font-bold tracking-widest">V 2026.6.26</span>
+                      <span className="text-gray-400 dark:text-[#64748B] text-[10px] font-bold tracking-widest">V 2026.8.8</span>
                     </div>
 
                   </div>
